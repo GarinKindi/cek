@@ -47,12 +47,31 @@ const SUPABASE_ANON_KEY = 'sb_publishable_VV0HrXGLNlGa9GQGXSrWXA_X1qLdoUf';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==============================================
+// FUNGSI GLOBAL UPLOAD GAMBAR DARI PERANGKAT
+// ==============================================
+const handleImageUpload = (event, callback, showToastFn) => {
+    const file = event.target.files[0];
+    if (file) {
+        // Batas maksimal 2MB agar database tidak berat
+        if (file.size > 2 * 1024 * 1024) { 
+            if(showToastFn) showToastFn('Gagal: Ukuran gambar terlalu besar! Maksimal 2MB.', 'error');
+            else alert('Gagal: Ukuran gambar maksimal 2MB!');
+            event.target.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => callback(reader.result);
+        reader.readAsDataURL(file);
+    }
+};
+
+// ==============================================
 // 2. DATA FALLBACK KAYA FITUR (Hanya dipanggil saat API gagal total)
 // ==============================================
 const fallbackHero = {
     tagline: 'Destinasi Wisata Ramah Lingkungan',
-    titleMain: 'Wisata Edukasi',
-    titleHighlight: 'Kampung Berseri',
+    title_main: 'Wisata Edukasi',
+    title_highlight: 'Kampung Berseri',
     description: 'Belajar langsung tentang pertanian organik, peternakan berkelanjutan, dan budaya pedesaan dari kearifan masyarakat lokal.',
     image: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&q=80&w=2000'
 };
@@ -70,10 +89,10 @@ async function fetchHero() {
     if (error) console.error("Error Hero:", error); 
     return (data && data.length > 0) ? data[0] : fallbackHero; 
 }
-async function fetchPaket() { const { data, error } = await supabase.from('paket').select('*'); if (error) console.error("Error Paket:", error); return data || []; }
-async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*'); if (error) console.error("Error Edukasi:", error); return data || []; }
-async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*'); if (error) console.error("Error Mitra:", error); return data || []; }
-async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*'); if (error) console.error("Error Galeri:", error); return data ? data.map(i => i.image_url) : []; }
+async function fetchPaket() { const { data, error } = await supabase.from('paket').select('*').order('id', { ascending: true }); if (error) console.error("Error Paket:", error); return data || []; }
+async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*').order('id', { ascending: true }); if (error) console.error("Error Edukasi:", error); return data || []; }
+async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*').order('id', { ascending: true }); if (error) console.error("Error Mitra:", error); return data || []; }
+async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*').order('id', { ascending: false }); if (error) console.error("Error Galeri:", error); return data ? data.map(i => i.image_url) : []; }
 
 // ==============================================
 // 4. IKON & HELPER UNTUK UI KAYA FITUR
@@ -613,13 +632,10 @@ function LoginAdmin({ setGlobalRoute }) {
 // ==============================================
 // 7. KOMPONEN CRUD ADMIN
 // ==============================================
-function ManagePaket({ data, onSave }) {
+function ManagePaket({ data, onSave, showToast }) {
     const [items, setItems] = useState(data || []);
     
-    // Sinkronisasi form dengan data terbaru setiap reload dari DB
-    useEffect(() => {
-        setItems(data || []);
-    }, [data]);
+    useEffect(() => { setItems(data || []); }, [data]);
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Paket Baru', price: 0, duration: '1 Hari', desc: '', activities: [], images: [] }]);
@@ -658,9 +674,26 @@ function ManagePaket({ data, onSave }) {
                                 <textarea value={(item.activities || []).join('\n')} onChange={e => updateItem(item.id, 'activities', e.target.value.split('\n').map(s=>s.trim()).filter(Boolean))} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-stone-50" rows="4" placeholder="Keliling Desa Berseri&#10;Belajar Membuat Pupuk&#10;Makan Siang Bersama"></textarea>
                             </div>
                             <div className="bg-white p-5 rounded-2xl border border-stone-200">
-                                <label className="block text-sm font-bold text-stone-700 mb-1">Link Foto (Dari Internet)</label>
-                                <p className="text-xs text-stone-500 mb-3"><i className="fas fa-keyboard text-emerald-500 mr-1"></i> Pisahkan setiap foto dengan menekan tombol <strong>Enter</strong>.</p>
-                                <textarea value={(item.images || (item.image ? [item.image] : [])).join('\n')} onChange={e => updateItem(item.id, 'images', e.target.value.split('\n').map(s=>s.trim()).filter(Boolean))} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed text-sm text-blue-600 bg-stone-50" rows="4" placeholder="https://contoh-link-foto-1.jpg&#10;https://contoh-link-foto-2.jpg"></textarea>
+                                <label className="block text-sm font-bold text-stone-700 mb-1">Foto Paket Wisata (Maks 2MB/foto)</label>
+                                <p className="text-xs text-stone-500 mb-3">Anda dapat mengunggah lebih dari 1 foto untuk paket wisata ini.</p>
+                                <div className="flex flex-wrap gap-3">
+                                    {(item.images || []).map((img, i) => (
+                                        <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-stone-200 shadow-sm group">
+                                            <img src={img} className="w-full h-full object-cover" />
+                                            <button type="button" onClick={() => updateItem(item.id, 'images', item.images.filter((_, idx) => idx !== i))} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-lg"></i></button>
+                                        </div>
+                                    ))}
+                                    <label className="w-20 h-20 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-100 transition shadow-sm">
+                                        <i className="fas fa-plus text-lg mb-1"></i>
+                                        <span className="text-[10px] font-bold">Upload</span>
+                                        <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
+                                            handleImageUpload(e, (base64) => {
+                                                const newImages = [...(item.images || []), base64];
+                                                updateItem(item.id, 'images', newImages);
+                                            }, showToast);
+                                        }} />
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -679,12 +712,10 @@ function ManagePaket({ data, onSave }) {
     );
 }
 
-function ManageEdukasi({ data, onSave }) {
+function ManageEdukasi({ data, onSave, showToast }) {
     const [items, setItems] = useState(data || []);
     
-    useEffect(() => {
-        setItems(data || []);
-    }, [data]);
+    useEffect(() => { setItems(data || []); }, [data]);
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Materi Baru', desc: '', image: '', details: [] }]);
@@ -719,7 +750,27 @@ function ManageEdukasi({ data, onSave }) {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 mt-6">
                             <div><label className="block text-sm font-bold text-stone-700 mb-2">Judul Materi Pembelajaran</label><input value={item.title || ''} onChange={e => updateItem(item.id, 'title', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: Pembuatan Pupuk Kompos" /></div>
-                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Link Foto Utama (URL Gambar)</label><input value={item.image || ''} onChange={e => updateItem(item.id, 'image', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none text-blue-600" placeholder="https://..." /></div>
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Foto Materi Utama</label>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-24 h-14 bg-stone-100 border border-stone-300 rounded-lg overflow-hidden shadow-sm relative group flex-shrink-0">
+                                        {item.image ? (
+                                            <>
+                                                <img src={item.image} className="w-full h-full object-cover" />
+                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash"></i></button>
+                                            </>
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-xl"></i></div>
+                                        )}
+                                    </div>
+                                    <label className="cursor-pointer bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg font-bold text-xs hover:bg-blue-100 transition shadow-sm flex items-center justify-center gap-2 w-full text-center">
+                                        <i className="fas fa-upload"></i> Upload Foto Baru
+                                        <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
+                                            handleImageUpload(e, (base64) => updateItem(item.id, 'image', base64), showToast);
+                                        }} />
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                         <div className="mb-6"><label className="block text-sm font-bold text-stone-700 mb-2">Penjelasan Singkat</label><textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="Gambarkan materi ini secara singkat..."></textarea></div>
                         <div className="bg-white p-5 rounded-2xl border border-stone-200">
@@ -742,12 +793,10 @@ function ManageEdukasi({ data, onSave }) {
     );
 }
 
-function ManageKemitraan({ data, onSave }) {
+function ManageKemitraan({ data, onSave, showToast }) {
     const [items, setItems] = useState(data || []);
     
-    useEffect(() => {
-        setItems(data || []);
-    }, [data]);
+    useEffect(() => { setItems(data || []); }, [data]);
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Mitra Baru', type: 'Instansi Pemerintah', logo: '', badge: 'bg-blue-50 text-blue-700' }]);
@@ -769,8 +818,15 @@ function ManageKemitraan({ data, onSave }) {
                     <div key={item.id} className="bg-stone-50 rounded-2xl p-5 border border-stone-200 flex flex-col sm:flex-row gap-5 items-center relative hover:shadow-md transition">
                         <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg" title="Hapus"><i className="fas fa-trash"></i></button>
                         
-                        <div className="w-20 h-20 bg-white rounded-full border-4 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center bg-stone-100">
-                            {item.logo ? <img src={item.logo} className="w-full h-full object-cover"/> : <i className="fas fa-building text-3xl text-stone-300"></i>}
+                        <div className="w-20 h-20 bg-white rounded-full border-4 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center bg-stone-100 relative group">
+                            {item.logo ? (
+                                <>
+                                    <img src={item.logo} className="w-full h-full object-cover"/>
+                                    <button type="button" onClick={() => updateItem(item.id, 'logo', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all rounded-full"><i className="fas fa-times"></i></button>
+                                </>
+                            ) : (
+                                <i className="fas fa-building text-3xl text-stone-300"></i>
+                            )}
                         </div>
                         <div className="flex-1 w-full space-y-3">
                             <div>
@@ -796,8 +852,13 @@ function ManageKemitraan({ data, onSave }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-stone-500 uppercase">Link Logo/Foto Instansi</label>
-                                <input value={item.logo || ''} onChange={e => updateItem(item.id, 'logo', e.target.value)} className="w-full border border-stone-300 rounded-lg p-2 text-xs text-blue-600 focus:ring-2 focus:ring-amber-500 outline-none" placeholder="https://..." />
+                                <label className="text-xs font-bold text-stone-500 uppercase mb-1 block">Upload Logo Instansi</label>
+                                <label className="cursor-pointer bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-100 transition flex justify-center items-center gap-2 w-full text-center">
+                                    <i className="fas fa-upload"></i> Pilih Gambar
+                                    <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
+                                        handleImageUpload(e, (base64) => updateItem(item.id, 'logo', base64), showToast);
+                                    }} />
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -812,30 +873,27 @@ function ManageKemitraan({ data, onSave }) {
     );
 }
 
-function ManageGaleri({ data, onSave }) {
+function ManageGaleri({ data, onSave, showToast }) {
     const [items, setItems] = useState(data || []);
 
-    useEffect(() => {
-        setItems(data || []);
-    }, [data]);
+    useEffect(() => { setItems(data || []); }, [data]);
     
     return (
         <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
             <h2 className="text-3xl font-extrabold text-stone-800 mb-2">Kelola Galeri Foto</h2>
             <p className="text-stone-500 mb-8">Kumpulan foto momen seru yang tampil di halaman Galeri.</p>
             
-            <div className="mb-8 p-6 bg-stone-50 border border-stone-200 rounded-2xl">
-                <label className="block text-sm font-bold text-stone-700 mb-2">Tambahkan Foto Baru</label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <input id="new-galeri-url" type="text" placeholder="Masukkan Link (URL) Foto dari Internet (Contoh: https://...)" className="flex-1 border border-stone-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500 text-blue-600" />
-                    <button type="button" onClick={() => {
-                        const input = document.getElementById('new-galeri-url');
-                        if(input.value) {
-                            setItems([input.value, ...items]); // Tambah ke depan
-                            input.value = '';
-                        }
-                    }} className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold transition shadow-sm whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Tambah Foto</button>
-                </div>
+            <div className="mb-8">
+                <label className="cursor-pointer w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border-2 border-dashed border-purple-300 rounded-2xl py-12 flex flex-col items-center justify-center transition-all">
+                    <div className="w-16 h-16 bg-purple-200 text-purple-600 rounded-full flex items-center justify-center text-3xl mb-3 shadow-sm"><i className="fas fa-cloud-upload-alt"></i></div>
+                    <span className="font-bold text-lg">Klik Disini Untuk Upload Foto Baru</span>
+                    <span className="text-sm text-purple-500 mt-1">Format: JPG, JPEG, PNG. Maksimal ukuran 2MB per foto</span>
+                    <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
+                        handleImageUpload(e, (base64) => {
+                            setItems([base64, ...items]); // Tambah ke posisi paling depan
+                        }, showToast);
+                    }} />
+                </label>
             </div>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -894,25 +952,6 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
         localStorage.removeItem('admin_logged_in');
         localStorage.removeItem('admin_username');
         setGlobalRoute('login');
-    };
-
-    // Fungsi Upload & Compress Gambar menjadi Text (Base64)
-    const handleHeroImageUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            // Batasi ukuran file (misal maksimal 2MB) agar DB tidak error/lag
-            if (file.size > 2 * 1024 * 1024) {
-                showToast('Ukuran gambar terlalu besar! Maksimal 2MB agar website tetap cepat.', 'error');
-                e.target.value = ''; // reset file input
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreviewHeroImg(reader.result); // Simpan string gambar untuk dikirim ke DB
-            };
-            reader.readAsDataURL(file);
-        }
     };
 
     // Fungsi menyimpan Hero Tunggal
@@ -1045,9 +1084,19 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                         
                         <div className="space-y-6 bg-stone-50 p-6 md:p-8 rounded-2xl border border-stone-200">
                             <div>
-                                <label className="block text-sm font-bold text-stone-700 mb-2">Judul Utama Website</label>
-                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold" defaultValue={hero.titleMain || hero.title_main} placeholder="Contoh: Wisata Edukasi" id="h-title" />
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Tagline (Teks kecil di atas judul)</label>
+                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-md font-medium" defaultValue={hero.tagline} placeholder="Contoh: Destinasi Wisata Ramah Lingkungan" id="h-tagline" />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Judul Utama Website (Teks Putih)</label>
+                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold" defaultValue={hero.title_main || hero.titleMain} placeholder="Contoh: Wisata Edukasi" id="h-title" />
                                 <p className="text-xs text-stone-500 mt-2">Ini akan muncul paling besar di bagian atas beranda.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Kata Kunci Judul (Teks Kuning/Highlight)</label>
+                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold text-amber-600" defaultValue={hero.title_highlight || hero.titleHighlight} placeholder="Contoh: Kampung Berseri" id="h-title-highlight" />
                             </div>
                             
                             <div>
@@ -1060,15 +1109,18 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                             <div className="pt-4 border-t border-stone-200">
                                 <label className="block text-sm font-bold text-stone-700 mb-3">Ganti Foto Latar Belakang (Gambar Besar)</label>
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
-                                    <div className="w-32 h-20 rounded-lg overflow-hidden bg-stone-100 flex-shrink-0 border border-stone-200 shadow-inner">
+                                    <div className="w-32 h-20 rounded-lg overflow-hidden bg-stone-100 flex-shrink-0 border border-stone-200 shadow-inner relative group">
                                         {previewHeroImg ? (
-                                            <img src={previewHeroImg} className="w-full h-full object-cover" alt="Pratinjau Beranda" />
+                                            <>
+                                                <img src={previewHeroImg} className="w-full h-full object-cover" alt="Pratinjau Beranda" />
+                                                <button type="button" onClick={() => setPreviewHeroImg('')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash"></i></button>
+                                            </>
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center"><i className="fas fa-image text-stone-300 text-2xl"></i></div>
                                         )}
                                     </div>
                                     <div className="flex-1 w-full">
-                                        <input type="file" id="hero-img-upload" accept="image/jpeg, image/png, image/jpg" onChange={handleHeroImageUpload} className="hidden" />
+                                        <input type="file" id="hero-img-upload" accept="image/jpeg, image/png, image/jpg" onChange={(e) => handleImageUpload(e, setPreviewHeroImg, showToast)} className="hidden" />
                                         <label htmlFor="hero-img-upload" className="inline-flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-2.5 px-5 rounded-xl cursor-pointer transition w-full sm:w-auto text-center border border-emerald-200 shadow-sm">
                                             <i className="fas fa-upload mr-2"></i> Pilih Foto Baru dari Perangkat
                                         </label>
@@ -1088,23 +1140,24 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                         <button type="button" onClick={(e) => {
                             e.preventDefault();
                             const newHero = {
-                                ...hero, 
+                                id: 1, 
+                                tagline: document.getElementById('h-tagline').value,
                                 title_main: document.getElementById('h-title').value, 
+                                title_highlight: document.getElementById('h-title-highlight').value,
                                 description: document.getElementById('h-desc').value,
                                 image: previewHeroImg // Simpan gambar hasil upload!
                             };
-                            delete newHero.titleMain; // Mencegah bentrok dengan DB column title_main
-                            wrapSave(async () => { await supabase.from('hero').upsert({ id: 1, ...newHero }); }, 'Halaman Utama');
+                            wrapSave(async () => { await supabase.from('hero').upsert(newHero); }, 'Halaman Utama');
                         }} className="w-full mt-6 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-extrabold hover:bg-emerald-700 transition shadow-xl text-lg flex justify-center items-center gap-3">
                             <i className="fas fa-save text-xl"></i> SIMPAN TAMPILAN UTAMA
                         </button>
                     </div>
                 )}
 
-                {menu === 'paket' && <ManagePaket data={paket} onSave={handleSaveList} />}
-                {menu === 'edukasi' && <ManageEdukasi data={edukasi} onSave={handleSaveList} />}
-                {menu === 'kemitraan' && <ManageKemitraan data={kemitraan} onSave={handleSaveList} />}
-                {menu === 'galeri' && <ManageGaleri data={galeri} onSave={handleSaveList} />}
+                {menu === 'paket' && <ManagePaket data={paket} onSave={handleSaveList} showToast={showToast} />}
+                {menu === 'edukasi' && <ManageEdukasi data={edukasi} onSave={handleSaveList} showToast={showToast} />}
+                {menu === 'kemitraan' && <ManageKemitraan data={kemitraan} onSave={handleSaveList} showToast={showToast} />}
+                {menu === 'galeri' && <ManageGaleri data={galeri} onSave={handleSaveList} showToast={showToast} />}
             </div>
         </div>
     );
@@ -1133,7 +1186,6 @@ function App() {
     };
 
     // Muat data HANYA saat aplikasi pertama kali dijalankan
-    // Tidak ada force redirect auto-login disini
     useEffect(() => {
         loadAllData();
     }, []);
