@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kampung Berseri - Web & Admin Terintegrasi</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; background-color: #f5f5f4;}
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #047857; }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ==============================================
+// 1. KONFIGURASI SUPABASE
+// ==============================================
+const SUPABASE_URL = 'https://yiesgjzblaneltyuiazb.supabase.co';  
+const SUPABASE_ANON_KEY = 'sb_publishable_VV0HrXGLNlGa9GQGXSrWXA_X1qLdoUf';  
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ==============================================
+// 2. DATA FALLBACK KAYA FITUR (Hanya dipanggil saat API gagal total)
+// ==============================================
+const fallbackHero = {
+    tagline: 'Destinasi Wisata Ramah Lingkungan',
+    titleMain: 'Wisata Edukasi',
+    titleHighlight: 'Kampung Berseri',
+    description: 'Belajar langsung tentang pertanian organik, peternakan berkelanjutan, dan budaya pedesaan dari kearifan masyarakat lokal.',
+    image: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&q=80&w=2000'
+};
+
+const olehOlehDataStatic = [
+    { id: 'oo-1', paketId: 'Edukasi', waNumber: '6281111111111', title: 'Oleh-Oleh Edukasi', desc: 'Bawa pulang media tanam organik dan POC untuk dipraktikkan di rumah.', image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&q=80&w=600' },
+    { id: 'oo-2', paketId: 'Budaya', waNumber: '6282222222222', title: 'Oleh-Oleh Budaya', desc: 'Kerajinan tangan otentik, kain lurik, dan camilan tradisional.', image: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&q=80&w=600' }
+];
+
+// ==============================================
+// 3. FUNGSI DATABASE (CRUD)
+// Perbaikan: tidak ada lagi paksaan fallback jika db kosong (hanya array kosong)
+// Menggunakan .maybeSingle() agar tidak error "0 rows" ketika database baru saja di-reset.
+// ==============================================
+async function fetchHero() { const { data, error } = await supabase.from('hero').select('*').eq('id', 1).maybeSingle(); if (error) console.error("Error Hero:", error); return data || fallbackHero; }
+async function fetchPaket() { const { data, error } = await supabase.from('paket').select('*'); if (error) console.error("Error Paket:", error); return data || []; }
+async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*'); if (error) console.error("Error Edukasi:", error); return data || []; }
+async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*'); if (error) console.error("Error Mitra:", error); return data || []; }
+async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*'); if (error) console.error("Error Galeri:", error); return data ? data.map(i => i.image_url) : []; }
+
+// ==============================================
+// 4. IKON & HELPER UNTUK UI KAYA FITUR
+// ==============================================
+const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+
+// Pemetaan Ikon FontAwesome
+const Leaf = ({ className }) => <i className={`fas fa-leaf ${className}`}></i>;
+const CheckCircle2 = ({ className }) => <i className={`fas fa-check-circle ${className}`}></i>;
+const ArrowRight = ({ className }) => <i className={`fas fa-arrow-right ${className}`}></i>;
+const ChevronLeft = ({ className }) => <i className={`fas fa-chevron-left ${className}`}></i>;
+const ChevronRight = ({ className }) => <i className={`fas fa-chevron-right ${className}`}></i>;
+const Calendar = ({ className }) => <i className={`fas fa-calendar-alt ${className}`}></i>;
+const MessageCircle = ({ className }) => <i className={`fab fa-whatsapp ${className}`}></i>;
+const Building2 = ({ className }) => <i className={`fas fa-building ${className}`}></i>;
+const Compass = ({ className }) => <i className={`fas fa-compass ${className}`}></i>;
+const X = ({ className }) => <i className={`fas fa-times ${className}`}></i>;
+
+// Komponen Slider Gambar
+const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const validImages = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1542601906990-b4d3fb778b09'];
+
+    useEffect(() => {
+        if(validImages.length <= 1) return;
+        const timer = setInterval(() => setCurrentIndex(prev => (prev === validImages.length - 1 ? 0 : prev + 1)), 3500);
+        return () => clearInterval(timer);
+    }, [validImages]);
+
+    return (
+        <div className={`relative ${heightClass} w-full overflow-hidden group rounded-t-3xl`}>
+            {validImages.map((img, idx) => (
+                <img key={idx} src={img} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
+            ))}
+            <div className="absolute inset-0 bg-gradient-to-t from-stone-900/90 via-stone-900/20 to-transparent z-10"></div>
+            
+            {validImages.length > 1 && (
+                <>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => prev === 0 ? validImages.length - 1 : prev - 1); }} className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all w-8 h-8 flex items-center justify-center"><ChevronLeft /></button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => prev === validImages.length - 1 ? 0 : prev + 1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all w-8 h-8 flex items-center justify-center"><ChevronRight /></button>
+                    <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-1.5">
+                        {validImages.map((_, idx) => (<div key={idx} className={`h-1.5 rounded-full transition-all ${idx === currentIndex ? 'bg-amber-400 w-4' : 'bg-white/50 w-1.5'}`}></div>))}
+                    </div>
+                </>
+            )}
+
+            {priceOverlay && (
+                <div className="absolute top-4 left-4 z-20">
+                    <span className="bg-amber-500 text-stone-900 font-bold px-3 py-1.5 rounded-lg text-sm shadow-md">
+                        {priceOverlay} <span className="text-xs font-medium">/ pax</span>
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ==============================================
+// 5. KOMPONEN WEBSITE PUBLIK (RICH UI)
+// ==============================================
+function PublicWebsite({ data, setGlobalRoute }) {
+    const [view, setView] = useState('home');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const hero = data?.hero || fallbackHero;
+    const paket = data?.paket || [];
+    const edukasi = data?.edukasi || [];
+    const kemitraan = data?.kemitraan || [];
+    const galeri = data?.galeri || [];
+
+    const navLinks = [
+        { id: 'home', label: 'Beranda' },
+        { id: 'edukasi', label: 'Materi Edukasi' },
+        { id: 'paket', label: 'Paket Wisata' },
+        { id: 'galeri', label: 'Galeri' },
+        { id: 'mitra', label: 'Kemitraan' },
+    ];
+
+    const changeView = (v) => { setView(v); setIsMenuOpen(false); window.scrollTo(0,0); };
+
+    // --- HALAMAN BERANDA ---
+    const HomeView = () => (
+        <div className="animate-in fade-in duration-500">
+            <section className="relative bg-emerald-900 h-[600px] flex items-center">
+                <div className="absolute inset-0 z-0">
+                    <img src={hero.image} className="w-full h-full object-cover opacity-40 mix-blend-overlay" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 via-stone-900/20 to-transparent"></div>
+                </div>
+                <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left pt-20">
+                    <span className="inline-block py-1 px-3 rounded-full bg-amber-500/20 text-amber-300 font-semibold text-sm mb-4 border border-amber-500/30 backdrop-blur-sm">{hero.tagline}</span>
+                    <h1 className="text-4xl md:text-6xl font-extrabold text-white leading-tight mb-6 max-w-3xl">{hero.title_main || hero.titleMain} <span className="text-amber-400">{hero.title_highlight || hero.titleHighlight}</span></h1>
+                    <p className="text-lg md:text-xl text-emerald-50 mb-8 max-w-2xl font-light">{hero.description}</p>
+                    <button type="button" onClick={() => changeView('paket')} className="bg-amber-600 hover:bg-amber-500 text-white px-8 py-4 rounded-full font-bold text-lg transition-transform hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2 mx-auto md:mx-0">Pilih Paket & Booking <ArrowRight className="text-base" /></button>
+                </div>
+            </section>
+
+            <section className="py-20 bg-stone-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl font-bold text-stone-800 mb-4">Materi Edukasi Kami</h2>
+                        <div className="w-24 h-1.5 bg-emerald-600 mx-auto rounded-full mb-6"></div>
+                    </div>
+                    {edukasi.length === 0 ? (
+                        <div className="text-center text-stone-500">Belum ada materi edukasi ditambahkan.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            {edukasi.slice(0, 3).map((item, index) => (
+                                <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-shadow group">
+                                    <div className="bg-emerald-50 text-emerald-600 w-16 h-16 rounded-xl flex items-center justify-center mb-6 text-2xl group-hover:scale-110 transition-transform"><Leaf /></div>
+                                    <h3 className="text-xl font-bold text-stone-800 mb-3">{item.title}</h3>
+                                    <p className="text-stone-600 text-sm mb-4 line-clamp-3">{item.desc || item.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {edukasi.length > 0 && (
+                        <div className="text-center mt-10">
+                            <button type="button" onClick={() => changeView('edukasi')} className="text-emerald-600 font-bold hover:text-emerald-700 underline underline-offset-4">Pelajari Selengkapnya</button>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {kemitraan.length > 0 && (
+                <section className="py-16 bg-white border-t border-stone-100">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                        <p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-8">Telah Dipercaya & Dikunjungi Oleh</p>
+                        <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 opacity-90 hover:opacity-100 transition-all duration-500">
+                            {kemitraan.slice(0, 4).map((mitra, idx) => (
+                                <div key={idx} className="flex items-center gap-3 bg-stone-50 px-5 py-2.5 rounded-full border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <img src={mitra.logo} alt={mitra.name} className="w-7 h-7 rounded-full object-cover shadow-sm" />
+                                    <span className="font-bold text-stone-700 text-sm">{mitra.name}</span>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => changeView('mitra')} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-4 ml-2">Lihat Semua Mitra</button>
+                        </div>
+                    </div>
+                </section>
+            )}
+        </div>
+    );
+
+    // --- HALAMAN EDUKASI ---
+    const EducationView = () => (
+        <div className="animate-in fade-in py-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-12 text-center md:text-left">
+                    <h1 className="text-4xl font-bold text-stone-800 mb-4">Materi Edukasi</h1>
+                    <p className="text-stone-600 text-lg max-w-3xl">Pusat pembelajaran berbasis data nyata dari praktik keseharian warga.</p>
+                </div>
+                {edukasi.length === 0 ? (
+                    <div className="text-center py-20 text-stone-500 bg-white rounded-2xl border border-dashed border-stone-300">Belum ada materi edukasi tersedia.</div>
+                ) : (
+                    <div className="space-y-16">
+                        {edukasi.map((data, index) => {
+                            const detailsList = Array.isArray(data.details) ? data.details : [{label: 'Keterangan', value: 'Lihat selengkapnya saat kunjungan.'}];
+                            return (
+                                <div key={index} className={`flex flex-col lg:flex-row gap-8 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
+                                    <div className="w-full lg:w-1/2">
+                                        <div className="relative rounded-3xl overflow-hidden shadow-lg group">
+                                            <img src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} className="w-full h-[300px] md:h-[400px] object-cover group-hover:scale-105 transition-transform duration-700" />
+                                        </div>
+                                    </div>
+                                    <div className="w-full lg:w-1/2 space-y-6">
+                                        <div>
+                                            <h2 className="text-3xl font-bold text-emerald-800 mb-3">{data.title}</h2>
+                                            <p className="text-stone-600 text-lg">{data.desc || data.description}</p>
+                                        </div>
+                                        <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm">
+                                            <ul className="space-y-4">
+                                                {detailsList.map((detail, i) => (
+                                                    <li key={i} className="flex gap-4">
+                                                        <div className="w-1/3 font-semibold text-emerald-700 flex items-start gap-2"><CheckCircle2 className="text-amber-500 mt-1" />{detail.label}</div>
+                                                        <div className="w-2/3 text-stone-700">{detail.value}</div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // --- HALAMAN PAKET & OLEH-OLEH ---
+    const PackagesView = () => {
+        const [bookingFormPkg, setBookingFormPkg] = useState(null); 
+        const [formData, setFormData] = useState({ nama: '', asal: '', jumlah: '', tanggal: '', catatan: '' });
+        
+        const adminWAPaket = "6285643545567";
+
+        const handleBookingSubmit = (e) => {
+            e.preventDefault();
+            const text = `Halo Admin Kampung Berseri 👋\n\nSaya ingin booking paket wisata:\n\n📦 Paket: ${bookingFormPkg.name}\n👤 Nama: ${formData.nama}\n🏙️ Asal: ${formData.asal}\n👥 Jumlah Peserta: ${formData.jumlah} Orang\n📅 Tanggal Kunjungan: ${formData.tanggal}\n📝 Catatan: ${formData.catatan || '-'}\n\nMohon info detail dan total biayanya ya. Terima kasih 🙏`;
+            window.open(`https://wa.me/${adminWAPaket}?text=${encodeURIComponent(text)}`, '_blank');
+            setBookingFormPkg(null);
+            setFormData({ nama: '', asal: '', jumlah: '', tanggal: '', catatan: '' });
+        };
+
+        return (
+            <div className="bg-stone-50 min-h-screen animate-in fade-in relative">
+                <div className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-16">
+                        <span className="text-amber-600 font-bold uppercase tracking-wider text-sm">Reservasi Cepat & Mudah</span>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-stone-800 mt-2 mb-4">Pilih Paket Wisata Anda</h1>
+                        <p className="text-stone-600 max-w-2xl mx-auto text-lg">Eksplorasi pilihan kegiatan kami. Sistem akan langsung menghubungkan Anda ke WhatsApp Admin.</p>
+                    </div>
+
+                    {paket.length === 0 ? (
+                        <div className="text-center py-20 text-stone-500 bg-white rounded-2xl border border-dashed border-stone-300">Belum ada paket wisata ditambahkan.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
+                            {paket.map((pkg, index) => {
+                                const activities = pkg.activities || ['Eksplorasi desa', 'Materi edukasi', 'Ramah tamah'];
+                                const images = Array.isArray(pkg.images) && pkg.images.length > 0 ? pkg.images : [pkg.image || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09'];
+                                
+                                return (
+                                    <div key={index} className="bg-white rounded-3xl shadow-sm hover:shadow-xl transition-all border border-stone-200 flex flex-col h-full relative group">
+                                        <ImageSlider images={images} heightClass="h-64" priceOverlay={formatRupiah(pkg.price)} />
+                                        <div className="p-8 flex-grow flex flex-col">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-xl"><Compass /></div>
+                                                <h3 className="text-2xl font-bold text-stone-800">{pkg.name}</h3>
+                                            </div>
+                                            <p className="text-stone-600 mb-6 leading-relaxed flex-grow">{pkg.desc || pkg.description}</p>
+                                            <div className="space-y-4 mb-8">
+                                                <div className="flex items-center gap-2 text-stone-800 font-bold border-b border-stone-100 pb-2">
+                                                    <Calendar className="text-emerald-600" /> {pkg.duration || 'Bervariasi'}
+                                                </div>
+                                                <ul className="space-y-2">
+                                                    {activities.map((act, i) => (
+                                                        <li key={i} className="text-stone-600 text-sm flex items-start gap-2">
+                                                            <CheckCircle2 className="text-emerald-500 mt-1" />{act}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div className="mt-auto">
+                                                <button type="button" onClick={() => setBookingFormPkg(pkg)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition-transform shadow-lg flex items-center justify-center gap-2 group-hover:-translate-y-1">
+                                                    Pilih Paket & Booking Sekarang <ArrowRight />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Bagian Oleh-oleh */}
+                <div className="bg-stone-900 py-20 relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-5 pointer-events-none"><Leaf className="text-white text-[500px] transform -translate-x-1/4 -translate-y-1/4" /></div>
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">Lengkapi Kunjungan dengan Oleh-Oleh</h2>
+                            <p className="text-stone-400 max-w-2xl mx-auto text-lg">Dukung pemberdayaan warga lokal. Pilih suvenir khas Kampung Berseri.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-center">
+                            {olehOlehDataStatic.map((oo) => (
+                                <div key={oo.id} className="bg-stone-800 border border-stone-700 rounded-2xl overflow-hidden flex flex-col hover:border-amber-500 transition-colors group">
+                                    <div className="h-40 overflow-hidden relative">
+                                        <img src={oo.image} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
+                                        <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-bold text-sm border border-stone-700">Paket {oo.paketId}</div>
+                                    </div>
+                                    <div className="p-6 flex flex-col flex-grow">
+                                        <h4 className="font-bold text-white mb-2">{oo.title}</h4>
+                                        <p className="text-stone-400 text-sm mb-6 flex-grow">{oo.desc}</p>
+                                        <button type="button" onClick={() => window.open(`https://wa.me/${oo.waNumber}?text=Halo saya ingin pesan oleh-oleh ${oo.title}`, '_blank')} className="w-full bg-green-500 hover:bg-green-400 text-stone-950 font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm">
+                                            <MessageCircle /> Pesan via WA
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Modal Form Booking */}
+                {bookingFormPkg && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden">
+                            <div className="bg-emerald-600 p-6 text-white flex justify-between items-center relative">
+                                <div className="relative z-10">
+                                    <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-1">Form Booking</p>
+                                    <h3 className="text-xl font-extrabold leading-tight">{bookingFormPkg.name}</h3>
+                                </div>
+                                <button type="button" onClick={() => setBookingFormPkg(null)} className="text-white hover:bg-white/20 p-2 rounded-full transition-colors relative z-10"><X /></button>
+                                <Leaf className="absolute right-0 top-0 text-white text-7xl opacity-10 transform translate-x-4 -translate-y-4" />
+                            </div>
+                            <form onSubmit={handleBookingSubmit} className="p-6 space-y-4 bg-stone-50">
+                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Nama Pemesan</label><input type="text" required value={formData.nama} onChange={(e)=>setFormData({...formData, nama: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Asal/Instansi</label><input type="text" required value={formData.asal} onChange={(e)=>setFormData({...formData, asal: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Jumlah</label><input type="number" required value={formData.jumlah} onChange={(e)=>setFormData({...formData, jumlah: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Tanggal</label><input type="date" required value={formData.tanggal} onChange={(e)=>setFormData({...formData, tanggal: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                </div>
+                                <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl mt-4 flex justify-center items-center gap-2 shadow-md"><MessageCircle /> Lanjut ke WhatsApp</button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // --- HALAMAN GALERI ---
+    const GalleryView = () => (
+        <div className="py-12 animate-in fade-in">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl font-bold text-stone-800 mb-4">Galeri Kegiatan</h1>
+                    <p className="text-stone-600 max-w-2xl mx-auto">Potret aktivitas nyata warga dan pengunjung di Kampung Berseri.</p>
+                </div>
+                {galeri.length === 0 ? (
+                    <div className="text-center py-20 text-stone-500 bg-white rounded-2xl border border-dashed border-stone-300">Belum ada foto kegiatan.</div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {galeri.map((src, idx) => (
+                            <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-200">
+                                <img src={src} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // --- HALAMAN KEMITRAAN ---
+    const KemitraanView = () => {
+        const [activeCategory, setActiveCategory] = useState('Semua');
+        const categories = ['Semua', ...new Set(kemitraan.map(item => item.type))];
+        const filteredPartners = activeCategory === 'Semua' ? kemitraan : kemitraan.filter(p => p.type === activeCategory);
+
+        return (
+            <div className="bg-stone-50 min-h-screen py-16 animate-in fade-in relative">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-12">
+                        <span className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wider mb-4"><Building2 /> Kemitraan & Kunjungan</span>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-stone-800 mb-4">Jejak Langkah Mitra Kami</h1>
+                    </div>
+
+                    {kemitraan.length === 0 ? (
+                        <div className="text-center py-20 text-stone-500 bg-white rounded-2xl border border-dashed border-stone-300 mb-24">Belum ada data kemitraan.</div>
+                    ) : (
+                        <>
+                            <div className="flex flex-wrap justify-center gap-3 mb-12">
+                                {categories.map((cat, idx) => (
+                                    <button type="button" key={idx} onClick={() => setActiveCategory(cat)} className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeCategory === cat ? 'bg-emerald-600 text-white' : 'bg-white text-stone-600 hover:bg-emerald-50 border border-stone-200'}`}>
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8 mb-24">
+                                {filteredPartners.map((mitra, index) => (
+                                    <div key={index} className="bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-sm hover:shadow-xl transition-all flex flex-col items-center text-center group">
+                                        <div className="w-24 h-24 rounded-full overflow-hidden mb-5 border-4 border-stone-50 shadow-md group-hover:scale-105 transition-transform duration-300">
+                                            <img src={mitra.logo || fallbackMitra[0].logo} alt={mitra.name} className="w-full h-full object-cover" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-stone-800 mb-3 line-clamp-2">{mitra.name}</h3>
+                                        <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${mitra.badge || 'bg-stone-100 text-stone-700'}`}>{mitra.type}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Ajakan Kerjasama Banner */}
+                    <div className="bg-emerald-900 rounded-3xl p-8 md:p-12 relative overflow-hidden shadow-2xl">
+                        <div className="absolute inset-0 opacity-10 pointer-events-none"><Leaf className="text-white text-[400px] transform translate-x-1/3 -translate-y-1/4" /></div>
+                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div className="text-center md:text-left md:w-2/3">
+                                <h2 className="text-3xl font-extrabold text-white mb-4">Jadilah Bagian dari Gerakan Kami!</h2>
+                                <p className="text-emerald-100 text-lg">Kami terbuka untuk kerjasama program CSR, penelitian akademik, maupun penawaran rombongan.</p>
+                            </div>
+                            <div className="md:w-1/3 w-full flex justify-center md:justify-end">
+                                <a href="https://wa.me/6285643545567?text=Halo, kami tertarik menjalin kerjasama/kunjungan instansi" target="_blank" className="w-full md:w-auto bg-amber-500 hover:bg-amber-400 text-stone-900 font-bold py-4 px-8 rounded-2xl transition-transform shadow-lg flex items-center justify-center gap-2 text-lg hover:-translate-y-1">
+                                    <MessageCircle /> Ajukan Kerjasama
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Render Utama PublicWebsite
+    return (
+        <div className="min-h-screen bg-stone-50 flex flex-col">
+            <nav className="bg-white shadow-sm sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between h-20 items-center">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => changeView('home')}>
+                            <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xl shadow-md"><Leaf /></div>
+                            <span className="font-extrabold text-xl tracking-tight text-stone-800">Kampung<span className="text-emerald-600">Berseri</span></span>
+                        </div>
+                        <div className="hidden md:flex space-x-8">
+                            {navLinks.map(link => (
+                                <button type="button" key={link.id} onClick={() => changeView(link.id)} className={`font-medium transition-colors border-b-2 py-7 ${view === link.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-stone-600 hover:text-emerald-600 hover:border-emerald-200'}`}>
+                                    {link.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button type="button" className="md:hidden text-stone-600 text-2xl" onClick={() => setIsMenuOpen(!isMenuOpen)}><i className={`fas fa-${isMenuOpen ? "times" : "bars"}`}></i></button>
+                    </div>
+                </div>
+                {isMenuOpen && (
+                    <div className="md:hidden bg-white border-t border-stone-100 px-4 py-2 space-y-1 shadow-lg">
+                        {navLinks.map(link => (
+                            <button type="button" key={link.id} onClick={() => changeView(link.id)} className={`block w-full text-left px-4 py-3 rounded-xl font-medium ${view === link.id ? 'bg-emerald-50 text-emerald-700' : 'text-stone-700 hover:bg-stone-50'}`}>
+                                {link.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </nav>
+
+            <main className="flex-grow">
+                {view === 'home' && <HomeView />}
+                {view === 'edukasi' && <EducationView />}
+                {view === 'paket' && <PackagesView />}
+                {view === 'galeri' && <GalleryView />}
+                {view === 'mitra' && <KemitraanView />}
+            </main>
+
+            <footer className="bg-stone-900 text-stone-400 py-10 mt-10">
+                <div className="max-w-7xl mx-auto px-4 text-center">
+                    <div className="text-2xl font-bold text-white mb-4"><Leaf className="text-emerald-500 mr-2" />Kampung Berseri</div>
+                    <p className="mb-6 max-w-md mx-auto">Wisata edukasi ramah lingkungan dan pelestarian budaya desa lokal.</p>
+                    <div className="border-t border-stone-800 pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
+                        <p>&copy; {new Date().getFullYear()} Kampung Berseri. All rights reserved.</p>
+                        <button type="button" onClick={() => setGlobalRoute('login')} className="mt-4 md:mt-0 text-emerald-500 hover:text-emerald-400 transition flex items-center gap-2">
+                            <i className="fas fa-lock"></i> Admin Login
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    );
+}
+
+// ==============================================
+// 6. KOMPONEN LOGIN ADMIN
+// ==============================================
+function LoginAdmin({ setGlobalRoute }) {
+    const [user, setUser] = useState('');
+    const [pass, setPass] = useState('');
+    const [status, setStatus] = useState({ type: '', msg: '' });
+    const [loading, setLoading] = useState(false);
+
+    // Cek status login HANYA saat komponen Login ini dibuka
+    useEffect(() => {
+        if (localStorage.getItem('admin_logged_in') === 'true') {
+            setGlobalRoute('admin');
+        }
+    }, [setGlobalRoute]);
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setStatus({ type: '', msg: '' });
+
+        try {
+            const { data, error } = await supabase.from('admin_users').select('*').eq('username', user).single();
+            
+            if (error || !data) {
+                if (user === 'admin' && pass === 'admin123') {
+                    localStorage.setItem('admin_logged_in', 'true');
+                    localStorage.setItem('admin_username', user);
+                    setStatus({ type: 'success', msg: 'Login berhasil (Demo Mode)!' });
+                    setTimeout(() => setGlobalRoute('admin'), 1000);
+                } else {
+                    setStatus({ type: 'error', msg: 'Username / Password salah!' });
+                }
+            } else if (data.password === pass) {
+                localStorage.setItem('admin_logged_in', 'true');
+                localStorage.setItem('admin_username', user);
+                setStatus({ type: 'success', msg: 'Login berhasil!' });
+                setTimeout(() => setGlobalRoute('admin'), 1000);
+            } else {
+                setStatus({ type: 'error', msg: 'Password salah!' });
+            }
+        } catch (err) {
+            setStatus({ type: 'error', msg: 'Terjadi kesalahan sistem.' });
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-stone-900 flex flex-col items-center justify-center p-4">
+            <button type="button" onClick={() => setGlobalRoute('public')} className="absolute top-6 left-6 text-white hover:text-emerald-200 flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-md transition">
+                <i className="fas fa-arrow-left"></i> Kembali ke Web
+            </button>
+
+            <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden fade-in">
+                <div className="bg-emerald-600 p-6 text-center">
+                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3"><i className="fas fa-leaf text-white text-3xl"></i></div>
+                    <h2 className="text-2xl font-bold text-white">Admin Dashboard</h2>
+                </div>
+                <div className="p-8">
+                    {status.msg && (
+                        <div className={`mb-4 p-3 rounded-xl text-sm flex items-center gap-2 ${status.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                            <i className={`fas ${status.type === 'error' ? 'fa-exclamation-triangle' : 'fa-check-circle'}`}></i> {status.msg}
+                        </div>
+                    )}
+                    <form onSubmit={handleLogin} className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-user text-emerald-600 mr-2"></i> Username</label>
+                            <input type="text" required value={user} onChange={(e)=>setUser(e.target.value)} className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-lock text-emerald-600 mr-2"></i> Password</label>
+                            <input type="password" required value={pass} onChange={(e)=>setPass(e.target.value)} className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin123" />
+                        </div>
+                        <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex justify-center items-center gap-2 mt-6">
+                            {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-sign-in-alt"></i> Masuk ke Dashboard</>}
+                        </button>
+                    </form>
+                    <div className="mt-6 pt-4 border-t border-stone-200 text-center text-xs text-stone-500">
+                        Demo Login: <strong>admin</strong> / <strong>admin123</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ==============================================
+// 7. KOMPONEN CRUD ADMIN
+// ==============================================
+function ManagePaket({ data, onSave }) {
+    const [items, setItems] = useState(data || []);
+    
+    // Sinkronisasi form dengan data terbaru setiap reload dari DB
+    useEffect(() => {
+        setItems(data || []);
+    }, [data]);
+
+    const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Paket Baru', price: 0, duration: '1 Hari', desc: '', activities: [], images: [] }]);
+    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus paket wisata ini? Data yang dihapus tidak bisa dikembalikan.')) setItems(items.filter(i => i.id !== id)); };
+    
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-stone-800">Kelola Paket Wisata</h2>
+                    <p className="text-stone-500 mt-1">Tambahkan, ubah, atau hapus pilihan paket wisata untuk pengunjung.</p>
+                </div>
+                <button type="button" onClick={addNew} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Paket Baru</button>
+            </div>
+            <div className="space-y-8">
+                {items.length === 0 && <div className="text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500 font-medium">Belum ada paket wisata. Klik tombol "Tambah Paket Baru" untuk memulai.</div>}
+                
+                {items.map((item, index) => (
+                    <div key={item.id} className="bg-stone-50/50 rounded-2xl p-6 border border-stone-200 relative shadow-sm hover:shadow-md transition duration-300">
+                        <div className="absolute top-0 left-0 bg-emerald-600 text-white px-4 py-1.5 rounded-br-2xl rounded-tl-2xl text-sm font-bold shadow-sm">Paket {index + 1}</div>
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2.5 rounded-xl transition" title="Hapus Paket"><i className="fas fa-trash"></i></button>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 mt-6">
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Nama Paket</label><input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Paket Edukasi" /></div>
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Harga (Isi dengan angka saja)</label><input type="number" value={item.price || 0} onChange={e => updateItem(item.id, 'price', parseInt(e.target.value) || 0)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: 75000" /></div>
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Durasi Wisata</label><input value={item.duration || ''} onChange={e => updateItem(item.id, 'duration', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: 4 Jam / 1 Hari" /></div>
+                        </div>
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi Singkat</label>
+                            <textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" rows="2" placeholder="Ceritakan daya tarik dari paket ini..."></textarea>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                                <label className="block text-sm font-bold text-stone-700 mb-1">Daftar Aktivitas</label>
+                                <p className="text-xs text-stone-500 mb-3"><i className="fas fa-keyboard text-emerald-500 mr-1"></i> Pisahkan setiap kegiatan dengan menekan tombol <strong>Enter</strong> (baris baru).</p>
+                                <textarea value={(item.activities || []).join('\n')} onChange={e => updateItem(item.id, 'activities', e.target.value.split('\n').map(s=>s.trim()).filter(Boolean))} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-stone-50" rows="4" placeholder="Keliling Desa Berseri&#10;Belajar Membuat Pupuk&#10;Makan Siang Bersama"></textarea>
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                                <label className="block text-sm font-bold text-stone-700 mb-1">Link Foto (Dari Internet)</label>
+                                <p className="text-xs text-stone-500 mb-3"><i className="fas fa-keyboard text-emerald-500 mr-1"></i> Pisahkan setiap foto dengan menekan tombol <strong>Enter</strong>.</p>
+                                <textarea value={(item.images || (item.image ? [item.image] : [])).join('\n')} onChange={e => updateItem(item.id, 'images', e.target.value.split('\n').map(s=>s.trim()).filter(Boolean))} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed text-sm text-blue-600 bg-stone-50" rows="4" placeholder="https://contoh-link-foto-1.jpg&#10;https://contoh-link-foto-2.jpg"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-8 p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-4">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex justify-center items-center flex-shrink-0 text-amber-500 text-xl"><i className="fas fa-info-circle"></i></div>
+                <div>
+                    <h4 className="font-bold text-amber-800 text-lg">Penting!</h4>
+                    <p className="text-amber-700">Perubahan yang Anda lakukan belum tersimpan di website pengunjung. <strong>Pastikan Anda menekan tombol simpan hijau di bawah ini</strong> setelah selesai mengedit.</p>
+                </div>
+            </div>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('paket', items); }} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA PERUBAHAN PAKET</button>
+        </div>
+    );
+}
+
+function ManageEdukasi({ data, onSave }) {
+    const [items, setItems] = useState(data || []);
+    
+    useEffect(() => {
+        setItems(data || []);
+    }, [data]);
+
+    const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Materi Baru', desc: '', image: '', details: [] }]);
+    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus materi edukasi ini?')) setItems(items.filter(i => i.id !== id)); };
+
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-stone-800">Kelola Materi Edukasi</h2>
+                    <p className="text-stone-500 mt-1">Daftar pembelajaran yang bisa diikuti oleh wisatawan.</p>
+                </div>
+                <button type="button" onClick={addNew} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Materi Baru</button>
+            </div>
+            <div className="space-y-8">
+                {items.length === 0 && <div className="text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500 font-medium">Belum ada materi edukasi.</div>}
+
+                {items.map((item, index) => {
+                    const detailsStr = (item.details || []).map(d => `${d.label}: ${d.value}`).join('\n');
+                    const handleDetailsChange = (val) => {
+                        const newDetails = val.split('\n').filter(l => l.includes(':')).map(l => {
+                            const [label, ...rest] = l.split(':');
+                            return { label: label.trim(), value: rest.join(':').trim() };
+                        });
+                        updateItem(item.id, 'details', newDetails);
+                    };
+
+                    return (
+                    <div key={item.id} className="bg-stone-50/50 rounded-2xl p-6 border border-stone-200 relative shadow-sm hover:shadow-md transition">
+                        <div className="absolute top-0 left-0 bg-blue-600 text-white px-4 py-1.5 rounded-br-2xl rounded-tl-2xl text-sm font-bold shadow-sm">Materi {index + 1}</div>
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2.5 rounded-xl transition" title="Hapus Materi"><i className="fas fa-trash"></i></button>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 mt-6">
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Judul Materi Pembelajaran</label><input value={item.title || ''} onChange={e => updateItem(item.id, 'title', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: Pembuatan Pupuk Kompos" /></div>
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Link Foto Utama (URL Gambar)</label><input value={item.image || ''} onChange={e => updateItem(item.id, 'image', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none text-blue-600" placeholder="https://..." /></div>
+                        </div>
+                        <div className="mb-6"><label className="block text-sm font-bold text-stone-700 mb-2">Penjelasan Singkat</label><textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="Gambarkan materi ini secara singkat..."></textarea></div>
+                        <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                            <label className="block text-sm font-bold text-stone-700 mb-1">Info Tambahan Terperinci</label>
+                            <p className="text-xs text-stone-500 mb-3">Tuliskan nama info dan isinya dipisah tanda <strong>titik dua (:)</strong>. Gunakan <strong>Enter</strong> untuk membuat info baru.</p>
+                            <textarea value={detailsStr} onChange={e => handleDetailsChange(e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none bg-stone-50 leading-relaxed" rows="3" placeholder={"Contoh penulisan:\nBahan : Kotoran sapi dan dedaunan kering\nLama Proses : Sekitar 2 Minggu\nHasil : Pupuk organik siap pakai"}></textarea>
+                        </div>
+                    </div>
+                )})}
+            </div>
+            
+            <div className="mt-8 p-4 bg-blue-50 rounded-2xl border border-blue-200 flex items-start gap-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex justify-center items-center flex-shrink-0 text-blue-500 text-xl"><i className="fas fa-info-circle"></i></div>
+                <div>
+                    <p className="text-blue-800 pt-2 font-medium">Pastikan menekan tombol simpan di bawah ini agar materi tampil di website.</p>
+                </div>
+            </div>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('edukasi', items); }} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA MATERI EDUKASI</button>
+        </div>
+    );
+}
+
+function ManageKemitraan({ data, onSave }) {
+    const [items, setItems] = useState(data || []);
+    
+    useEffect(() => {
+        setItems(data || []);
+    }, [data]);
+
+    const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Mitra Baru', type: 'Instansi Pemerintah', logo: '', badge: 'bg-blue-50 text-blue-700' }]);
+    const deleteItem = (id) => { if (confirm('Hapus mitra ini?')) setItems(items.filter(i => i.id !== id)); };
+
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-stone-800">Daftar Kunjungan & Mitra</h2>
+                    <p className="text-stone-500 mt-1">Siapa saja instansi yang pernah berkunjung atau bekerja sama.</p>
+                </div>
+                <button type="button" onClick={addNew} className="bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Mitra Baru</button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {items.length === 0 && <div className="col-span-full text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500">Belum ada data instansi mitra.</div>}
+                
+                {items.map(item => (
+                    <div key={item.id} className="bg-stone-50 rounded-2xl p-5 border border-stone-200 flex flex-col sm:flex-row gap-5 items-center relative hover:shadow-md transition">
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg" title="Hapus"><i className="fas fa-trash"></i></button>
+                        
+                        <div className="w-20 h-20 bg-white rounded-full border-4 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center bg-stone-100">
+                            {item.logo ? <img src={item.logo} className="w-full h-full object-cover"/> : <i className="fas fa-building text-3xl text-stone-300"></i>}
+                        </div>
+                        <div className="flex-1 w-full space-y-3">
+                            <div>
+                                <label className="text-xs font-bold text-stone-500 uppercase">Nama Instansi</label>
+                                <input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-lg p-2 font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 outline-none" placeholder="Contoh: Universitas Merdeka" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-stone-500 uppercase">Kategori</label>
+                                <select value={item.type || 'Instansi Pemerintah'} onChange={e => {
+                                    const type = e.target.value;
+                                    let badge = 'bg-stone-100 text-stone-700';
+                                    if(type==='Instansi Pemerintah') badge = 'bg-blue-50 text-blue-700';
+                                    if(type==='Universitas') badge = 'bg-emerald-50 text-emerald-700';
+                                    if(type==='Sekolah') badge = 'bg-amber-50 text-amber-700';
+                                    updateItem(item.id, 'type', type);
+                                    updateItem(item.id, 'badge', badge);
+                                }} className="w-full border border-stone-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white cursor-pointer">
+                                    <option>Instansi Pemerintah</option>
+                                    <option>Universitas</option>
+                                    <option>Sekolah</option>
+                                    <option>Perusahaan Swasta</option>
+                                    <option>Komunitas Umum</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-stone-500 uppercase">Link Logo/Foto Instansi</label>
+                                <input value={item.logo || ''} onChange={e => updateItem(item.id, 'logo', e.target.value)} className="w-full border border-stone-300 rounded-lg p-2 text-xs text-blue-600 focus:ring-2 focus:ring-amber-500 outline-none" placeholder="https://..." />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-8 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                 <p className="text-amber-800 text-center font-medium">Data baru disimpan setelah Anda menekan tombol di bawah.</p>
+            </div>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('kemitraan', items); }} className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA MITRA</button>
+        </div>
+    );
+}
+
+function ManageGaleri({ data, onSave }) {
+    const [items, setItems] = useState(data || []);
+
+    useEffect(() => {
+        setItems(data || []);
+    }, [data]);
+    
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+            <h2 className="text-3xl font-extrabold text-stone-800 mb-2">Kelola Galeri Foto</h2>
+            <p className="text-stone-500 mb-8">Kumpulan foto momen seru yang tampil di halaman Galeri.</p>
+            
+            <div className="mb-8 p-6 bg-stone-50 border border-stone-200 rounded-2xl">
+                <label className="block text-sm font-bold text-stone-700 mb-2">Tambahkan Foto Baru</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <input id="new-galeri-url" type="text" placeholder="Masukkan Link (URL) Foto dari Internet (Contoh: https://...)" className="flex-1 border border-stone-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-purple-500 text-blue-600" />
+                    <button type="button" onClick={() => {
+                        const input = document.getElementById('new-galeri-url');
+                        if(input.value) {
+                            setItems([input.value, ...items]); // Tambah ke depan
+                            input.value = '';
+                        }
+                    }} className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-bold transition shadow-sm whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Tambah Foto</button>
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {items.length === 0 && <div className="col-span-full text-center py-10 text-stone-400">Belum ada foto.</div>}
+                {items.map((url, idx) => (
+                    <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-100 border-2 border-stone-200 hover:border-purple-400 transition-colors">
+                        <img src={url} className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-900/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
+                            <i className="fas fa-trash text-3xl"></i>
+                            <span className="font-bold text-sm">Hapus Foto</span>
+                        </button>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-10 p-4 bg-purple-50 rounded-2xl border border-purple-200">
+                 <p className="text-purple-800 text-center font-medium">Klik tombol simpan di bawah untuk memperbarui galeri di website pengunjung.</p>
+            </div>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('galeri', items); }} className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN PERUBAHAN GALERI</button>
+        </div>
+    );
+}
+
+// ==============================================
+// 8. KOMPONEN ADMIN DASHBOARD
+// ==============================================
+function AdminDashboard({ setGlobalRoute, data, refreshData }) {
+    const [menu, setMenu] = useState('overview');
+    const [toast, setToast] = useState(null);
+
+    // Proteksi Route Admin agar tidak sembarangan diakses
+    useEffect(() => {
+        if (localStorage.getItem('admin_logged_in') !== 'true') {
+            setGlobalRoute('login');
+        }
+    }, [setGlobalRoute]);
+    
+    const hero = data?.hero || fallbackHero;
+    const paket = data?.paket || [];
+    const edukasi = data?.edukasi || [];
+    const kemitraan = data?.kemitraan || [];
+    const galeri = data?.galeri || [];
+
+    const showToast = (msg, type='success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3500);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('admin_logged_in');
+        localStorage.removeItem('admin_username');
+        setGlobalRoute('login');
+    };
+
+    // Fungsi menyimpan Hero Tunggal
+    const wrapSave = async (apiCall, section) => {
+        try {
+            await apiCall();
+            showToast(`Data ${section} berhasil diperbarui!`);
+            await refreshData(); // Sinkronkan ulang datanya
+        } catch (err) {
+            showToast(`Gagal: ${err.message}`, 'error');
+        }
+    };
+
+    // FUNGSI UNTUK MENYIMPAN ARRAY / LIST (Wipe & Insert Aman)
+    const handleSaveList = async (table, items) => {
+        try {
+            // Hapus semua data yang ada (id mulai dari 1, jadi neq 0 artinya hapus semua)
+            await supabase.from(table).delete().neq('id', 0);
+            
+            if (items.length > 0) {
+                let payload;
+                if (table === 'galeri') {
+                    payload = items.map(img => ({ image_url: img }));
+                } else {
+                    payload = items.map(item => {
+                        // 1. Ekstrak id sepenuhnya agar Supabase menghasilkan id baru dengan aman
+                        const { id, ...copy } = item;
+                        
+                        // 2. Samakan format desc ke description 
+                        if (copy.desc !== undefined) {
+                            copy.description = copy.desc;
+                            delete copy.desc;
+                        }
+
+                        // 3. Cegah error jika kolom belum ada di Supabase.
+                        if (table === 'edukasi') delete copy.details;
+                        if (table === 'paket') delete copy.activities;
+                        if (table === 'kemitraan') delete copy.badge;
+                        
+                        return copy;
+                    });
+                }
+                
+                const { error } = await supabase.from(table).insert(payload);
+                if (error) {
+                    if (error.code === '42501') throw new Error(`Akses Ditolak (RLS Aktif). Jalankan SQL ini di Supabase: ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY;`);
+                    throw error;
+                }
+            }
+            
+            showToast(`Data ${table} berhasil disimpan!`);
+            // MUAT ULANG DATA AGAR UI TIDAK MENGGUNAKAN FALLBACK TAPI DATA DATABASE ASLI
+            await refreshData(); 
+        } catch (err) {
+            showToast(`Gagal menyimpan ${table}: ` + err.message, 'error');
+            console.error(err);
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-stone-100 fade-in">
+            {toast && (
+                <div className={`fixed top-4 right-4 z-[9999] px-6 py-4 rounded-xl text-white font-bold shadow-2xl transition-all flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'}`}>
+                    <i className={`fas ${toast.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} text-2xl`}></i>
+                    {toast.msg}
+                </div>
+            )}
+            
+            <div className="w-64 bg-stone-900 text-stone-300 flex flex-col">
+                <div className="p-6 border-b border-stone-800 flex items-center gap-3">
+                    <i className="fas fa-leaf text-emerald-500 text-2xl"></i>
+                    <div><h1 className="font-bold text-white">Admin CMS</h1><p className="text-xs text-emerald-500">Kampung Berseri</p></div>
+                </div>
+                
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                    {[
+                        { id: 'overview', icon: 'chart-pie', label: 'Ringkasan' },
+                        { id: 'hero', icon: 'home', label: 'Tampilan Beranda' },
+                        { id: 'paket', icon: 'box', label: 'Paket Wisata' },
+                        { id: 'edukasi', icon: 'book-open', label: 'Edukasi' },
+                        { id: 'kemitraan', icon: 'building', label: 'Mitra' },
+                        { id: 'galeri', icon: 'images', label: 'Galeri' }
+                    ].map(btn => (
+                        <button type="button" key={btn.id} onClick={() => setMenu(btn.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${menu === btn.id ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-stone-800'}`}>
+                            <div className="w-5 text-center"><i className={`fas fa-${btn.icon}`}></i></div> {btn.label}
+                        </button>
+                    ))}
+                </nav>
+                
+                <div className="p-4 border-t border-stone-800 space-y-2">
+                    <button type="button" onClick={() => setGlobalRoute('public')} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-stone-800 transition text-stone-400">
+                        <i className="fas fa-external-link-alt w-5"></i> Lihat Website
+                    </button>
+                    <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-stone-800 transition">
+                        <i className="fas fa-sign-out-alt w-5"></i> Logout
+                    </button>
+                </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-8">
+                {menu === 'overview' && (
+                    <div className="fade-in">
+                        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-8 text-white mb-8 shadow-md">
+                            <h2 className="text-3xl font-bold mb-2">Selamat Datang, Admin!</h2>
+                            <p className="text-emerald-100">Kelola konten website Kampung Berseri. Perubahan akan langsung tersimpan.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            {[
+                                { title: 'Paket', count: paket.length, icon: 'box', color: 'emerald' },
+                                { title: 'Edukasi', count: edukasi.length, icon: 'book-open', color: 'blue' },
+                                { title: 'Mitra', count: kemitraan.length, icon: 'building', color: 'amber' },
+                                { title: 'Galeri', count: galeri.length, icon: 'images', color: 'purple' }
+                            ].map((stat, i) => (
+                                <div key={i} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 border-${stat.color}-500`}>
+                                    <i className={`fas fa-${stat.icon} text-${stat.color}-200 text-4xl mb-3`}></i>
+                                    <p className="text-3xl font-extrabold text-stone-800">{stat.count}</p>
+                                    <p className="text-sm font-medium text-stone-500 uppercase tracking-wide">{stat.title}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {menu === 'hero' && (
+                    <div className="bg-white p-8 rounded-3xl shadow-sm fade-in max-w-4xl">
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-extrabold text-stone-800">Pengaturan Halaman Utama</h2>
+                            <p className="text-stone-500 mt-1">Ini adalah teks sambutan besar yang pertama kali dilihat pengunjung saat membuka website Anda.</p>
+                        </div>
+                        
+                        <div className="space-y-6 bg-stone-50 p-6 md:p-8 rounded-2xl border border-stone-200">
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Judul Utama Website</label>
+                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold" defaultValue={hero.titleMain || hero.title_main} placeholder="Contoh: Wisata Edukasi" id="h-title" />
+                                <p className="text-xs text-stone-500 mt-2">Ini akan muncul paling besar di bagian atas beranda.</p>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi / Kalimat Sambutan</label>
+                                <textarea className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-stone-700" rows="5" defaultValue={hero.description} placeholder="Ceritakan singkat tentang tempat wisata Anda..." id="h-desc" />
+                                <p className="text-xs text-stone-500 mt-2">Teks pendukung di bawah judul utama yang menjelaskan sekilas tentang desa Anda.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-4">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex justify-center items-center flex-shrink-0 text-emerald-600 text-xl"><i className="fas fa-check-circle"></i></div>
+                            <div>
+                                <p className="text-emerald-800 pt-2 font-medium">Perubahan akan langsung terlihat di website publik setelah disimpan.</p>
+                            </div>
+                        </div>
+                        
+                        <button type="button" onClick={(e) => {
+                            e.preventDefault();
+                            const newHero = {
+                                ...hero, 
+                                title_main: document.getElementById('h-title').value, 
+                                description: document.getElementById('h-desc').value
+                            };
+                            delete newHero.titleMain; // Mencegah bentrok dengan DB column title_main
+                            wrapSave(async () => { await supabase.from('hero').upsert({ id: 1, ...newHero }); }, 'Halaman Utama');
+                        }} className="w-full mt-6 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-extrabold hover:bg-emerald-700 transition shadow-xl text-lg flex justify-center items-center gap-3">
+                            <i className="fas fa-save text-xl"></i> SIMPAN TAMPILAN UTAMA
+                        </button>
+                    </div>
+                )}
+
+                {menu === 'paket' && <ManagePaket data={paket} onSave={handleSaveList} />}
+                {menu === 'edukasi' && <ManageEdukasi data={edukasi} onSave={handleSaveList} />}
+                {menu === 'kemitraan' && <ManageKemitraan data={kemitraan} onSave={handleSaveList} />}
+                {menu === 'galeri' && <ManageGaleri data={galeri} onSave={handleSaveList} />}
+            </div>
+        </div>
+    );
+}
+
+// ==============================================
+// 9. ROOT ROUTER (PENGENDALI UTAMA)
+// ==============================================
+function App() {
+    const [globalRoute, setGlobalRoute] = useState('public');
+    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState({ hero: {}, paket: [], edukasi: [], kemitraan: [], galeri: [] });
+
+    const loadAllData = async () => {
+        setLoading(true);
+        try {
+            const [hero, paket, edukasi, kemitraan, galeri] = await Promise.all([
+                fetchHero(), fetchPaket(), fetchEdukasi(), fetchKemitraan(), fetchGaleri()
+            ]);
+            setData({ hero, paket, edukasi, kemitraan, galeri });
+        } catch (error) {
+            console.error("Gagal memuat data dari Supabase:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Muat data HANYA saat aplikasi pertama kali dijalankan
+    // Tidak ada force redirect auto-login disini
+    useEffect(() => {
+        loadAllData();
+    }, []);
+
+    if (loading) return (
+        <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-stone-600 font-medium">Memuat data wisata...</p>
+        </div>
+    );
+
+    return (
+        <React.Fragment>
+            {globalRoute === 'public' && <PublicWebsite data={data} setGlobalRoute={setGlobalRoute} />}
+            {globalRoute === 'login'  && <LoginAdmin setGlobalRoute={setGlobalRoute} />}
+            {globalRoute === 'admin'  && <AdminDashboard data={data} setGlobalRoute={setGlobalRoute} refreshData={loadAllData} />}
+        </React.Fragment>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
