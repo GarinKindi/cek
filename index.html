@@ -1147,7 +1147,13 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                                 description: document.getElementById('h-desc').value,
                                 image: previewHeroImg // Simpan gambar hasil upload!
                             };
-                            wrapSave(async () => { await supabase.from('hero').upsert(newHero); }, 'Halaman Utama');
+                            wrapSave(async () => { 
+                                const { error } = await supabase.from('hero').upsert(newHero); 
+                                if (error) {
+                                    if (error.code === '42501') throw new Error('Akses Ditolak (RLS Aktif). Jalankan SQL ini di Supabase: ALTER TABLE hero DISABLE ROW LEVEL SECURITY;');
+                                    throw error;
+                                }
+                            }, 'Halaman Utama');
                         }} className="w-full mt-6 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-extrabold hover:bg-emerald-700 transition shadow-xl text-lg flex justify-center items-center gap-3">
                             <i className="fas fa-save text-xl"></i> SIMPAN TAMPILAN UTAMA
                         </button>
