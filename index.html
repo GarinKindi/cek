@@ -1157,9 +1157,22 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('admin_logged_in');
-        localStorage.removeItem('admin_username');
-        setGlobalRoute('login');
+    // Hapus semua data admin dari localStorage
+    localStorage.removeItem('admin_logged_in');
+    localStorage.removeItem('admin_username');
+    
+    // Kosongkan state (opsional)
+    setMenu('overview');
+    
+    // Kembali ke halaman public
+    setGlobalRoute('public');
+    
+    // Refresh halaman untuk memastikan semua state bersih
+    // (Opsional, tapi membantu)
+    setTimeout(() => {
+        window.location.reload();
+    }, 100);
+};
     };
 
     // FUNGSI UNTUK MENYIMPAN HERO
