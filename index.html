@@ -226,14 +226,23 @@ const fallbackMitra = [{ id: 'm-1', name: 'Dinas Pertanian Jogja', type: 'Instan
 const fallbackGaleri = ['https://images.unsplash.com/photo-1530836369250-ef71a3f5e481?auto=format&fit=crop&q=80&w=500'];
 const fallbackOlehOleh = [{ id: 'oo-1', paket_id: 'Edukasi', wa_number: '6281111111111', title: 'Oleh-Oleh Khas Jogja', description: 'Bawa pulang media tanam organik buatan warga.', image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&q=80&w=600' }];
 
-// FUNGSI FETCH TERPISAH TELAH DIHAPUS 
-// Logika pengambilan data dipusatkan di dalam komponen utama (App) 
-// agar error bisa ditangkap dan dikirim ke UI dengan lebih elegan.
+// ==============================================
+// 3. FUNGSI DATABASE (CRUD DENGAN LOGIKA CERDAS)
+// ==============================================
+async function fetchHero() { const { data, error } = await supabase.from('hero').select('*').eq('id', 1).maybeSingle(); if (error) return fallbackHero; return data || fallbackHero; }
+async function fetchPaket() { const { data, error } = await supabase.from('paket').select('*').order('id', { ascending: true }); if (error) return fallbackPaket; return data; }
+async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*').order('id', { ascending: true }); if (error) return fallbackEdukasi; return data; }
+async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*').order('id', { ascending: true }); if (error) return fallbackMitra; return data; }
+async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*').order('id', { ascending: false }); if (error) return fallbackGaleri; return data.map(i => i.image_url); }
+async function fetchOlehOleh() { const { data, error } = await supabase.from('oleholeh').select('*').order('id', { ascending: true }); if (error) return fallbackOlehOleh; return data; }
 
 // ==============================================
 // 4. IKON & HELPER UNTUK UI
 // ==============================================
-const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+const formatRupiah = (number) => {
+  if (!number || number === 0) return 'Gratis';
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+};
 
 const Leaf = ({ className }) => <i className={`fas fa-leaf ${className}`}></i>;
 const CheckCircle2 = ({ className }) => <i className={`fas fa-check-circle ${className}`}></i>;
@@ -286,7 +295,9 @@ function LazyImage({ src, alt, className = "", imgClassName = "object-cover obje
 // Komponen Slider Gambar
 const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay, titleAlt="Paket Wisata Jogja" }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const validImages = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1542601906990-b4d3fb778b09'];
+    const validImages = Array.isArray(images) && images.length > 0 
+        ? images.filter(img => img && typeof img === 'string') 
+        : ['https://images.unsplash.com/photo-1542601906990-b4d3fb778b09'];
 
     useEffect(() => {
         if(validImages.length <= 1) return;
@@ -1175,7 +1186,7 @@ function AdminDashboard({ setGlobalRoute, data, refreshData, dbError }) {
     const [isSaving, setIsSaving] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // Proteksi Route menggunakan sesi Supabase (Ditingkatkan: Pengecekan Interval 5 Menit)
+    // Proteksi Route menggunakan sesi Supabase
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { session } } = await supabase.auth.getSession();
@@ -1196,7 +1207,7 @@ function AdminDashboard({ setGlobalRoute, data, refreshData, dbError }) {
     const galeri = data?.galeri || [];
     const olehOleh = data?.olehOleh || [];
 
-    const [previewHeroImg, setPreviewHeroImg] = useState('');
+    const [previewHeroImg, setPreviewHeroImg] = useState(hero.image || '');
     useEffect(() => {
         setPreviewHeroImg(hero.image || '');
     }, [hero.image]);
@@ -1235,7 +1246,7 @@ function AdminDashboard({ setGlobalRoute, data, refreshData, dbError }) {
                 // ROW-BY-ROW Galeri (Hindari delete massal)
                 const currentData = await supabase.from('galeri').select('id, image_url');
                 const currentItems = currentData.data || [];
-                const newUrls = items; // items di sini adalah array string (URL)
+                const newUrls = items; 
 
                 // Hapus yang tidak ada di list baru
                 for (const old of currentItems) {
