@@ -151,13 +151,21 @@ window.addEventListener('unhandledrejection', function(event) {
 // ==============================================
 // 1. KONFIGURASI SUPABASE
 // ==============================================
+// ⚠️ CATATAN PERFORMA REACT (PRODUCTION READY) ⚠️
+// Penggunaan <script src="...babel.min.js"> di file HTML ini HANYA untuk 
+// keperluan demo/prototyping agar aplikasi bisa berjalan dalam 1 file tunggal.
+// Untuk penggunaan di dunia nyata (Production), Anda WAJIB menggunakan 
+// build tools seperti Vite (npm create vite@latest) atau Next.js agar
+// kompilasi kode JSX dilakukan sebelum diunggah ke server, bukan di browser HP pengunjung.
+// ==============================================
+
 const SUPABASE_URL = 'https://yiesgjzblaneltyuiazb.supabase.co';  
 const SUPABASE_ANON_KEY = 'sb_publishable_VV0HrXGLNlGa9GQGXSrWXA_X1qLdoUf';  
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==============================================
 // FUNGSI UPLOAD GAMBAR KE SUPABASE STORAGE
-// Menggunakan auto-fallback jika bucket belum dibuat
+// Menggunakan standar murni ke Bucket (Mencegah Base64 Text di DB)
 // ==============================================
 const handleImageUploadModern = async (event, callback, showToastFn) => {
     const file = event.target.files[0];
@@ -178,14 +186,12 @@ const handleImageUploadModern = async (event, callback, showToastFn) => {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `public/${fileName}`;
 
-        // Mencoba upload ke Storage 'website-images'
+        // Mencoba upload ke Storage 'website-images' secara eksklusif
         const { data, error } = await supabase.storage
             .from('website-images')
             .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
-        if (error) {
-            throw error; // Lempar ke blok catch untuk memicu fallback Base64
-        }
+        if (error) throw error; // Lempar error langsung, tidak ada lagi fallback Base64!
 
         // Ambil URL Publik
         const { data: { publicUrl } } = supabase.storage
@@ -196,15 +202,9 @@ const handleImageUploadModern = async (event, callback, showToastFn) => {
         if (showToastFn) showToastFn('✅ Upload gambar berhasil!', 'success');
         
     } catch (error) {
-        console.warn('Storage upload gagal, beralih ke Mode Cadangan (Base64). Pesan:', error.message);
-        
-        // Mode Fallback (Base64) - Pasti berhasil walau tanpa bucket
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            callback(reader.result);
-            if (showToastFn) showToastFn('✅ Gambar disimpan (Mode Cadangan)', 'success');
-        };
-        reader.readAsDataURL(file);
+        console.error('❌ Storage upload gagal:', error.message);
+        const errorMsg = `Gagal upload: ${error.message}. Pastikan bucket 'website-images' sudah ada dan disetel ke Publik.`;
+        if (showToastFn) showToastFn(errorMsg, 'error'); else alert(errorMsg);
     }
     
     event.target.value = ''; // Reset input
@@ -226,15 +226,9 @@ const fallbackMitra = [{ id: 'm-1', name: 'Dinas Pertanian Jogja', type: 'Instan
 const fallbackGaleri = ['https://images.unsplash.com/photo-1530836369250-ef71a3f5e481?auto=format&fit=crop&q=80&w=500'];
 const fallbackOlehOleh = [{ id: 'oo-1', paket_id: 'Edukasi', wa_number: '6281111111111', title: 'Oleh-Oleh Khas Jogja', description: 'Bawa pulang media tanam organik buatan warga.', image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&q=80&w=600' }];
 
-// ==============================================
-// 3. FUNGSI DATABASE (CRUD DENGAN LOGIKA CERDAS)
-// ==============================================
-async function fetchHero() { const { data, error } = await supabase.from('hero').select('*').eq('id', 1).maybeSingle(); if (error) return fallbackHero; return data || fallbackHero; }
-async function fetchPaket() { const { data, error } = await supabase.from('paket').select('*').order('id', { ascending: true }); if (error) return fallbackPaket; return data; }
-async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*').order('id', { ascending: true }); if (error) return fallbackEdukasi; return data; }
-async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*').order('id', { ascending: true }); if (error) return fallbackMitra; return data; }
-async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*').order('id', { ascending: false }); if (error) return fallbackGaleri; return data.map(i => i.image_url); }
-async function fetchOlehOleh() { const { data, error } = await supabase.from('oleholeh').select('*').order('id', { ascending: true }); if (error) return fallbackOlehOleh; return data; }
+// FUNGSI FETCH TERPISAH TELAH DIHAPUS 
+// Logika pengambilan data dipusatkan di dalam komponen utama (App) 
+// agar error bisa ditangkap dan dikirim ke UI dengan lebih elegan.
 
 // ==============================================
 // 4. IKON & HELPER UNTUK UI
@@ -252,6 +246,44 @@ const Building2 = ({ className }) => <i className={`fas fa-building ${className}
 const Compass = ({ className }) => <i className={`fas fa-compass ${className}`}></i>;
 const X = ({ className }) => <i className={`fas fa-times ${className}`}></i>;
 
+// ==============================================
+// OPTIMASI PERFORMA: Komponen Lazy Image Cerdas
+// ==============================================
+const LazyImage = ({ src, alt, className = "", imgClassName = "object-cover object-center" }) => {
+    const [isIntersecting, setIsIntersecting] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const containerRef = useRef();
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                setIsIntersecting(true);
+                observer.disconnect(); // Berhenti memantau setelah gambar masuk layar
+            }
+        }, { rootMargin: '150px' }); // Unduh gambar 150px sebelum masuk ke layar
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={containerRef} className={`relative overflow-hidden bg-stone-200 ${className}`}>
+            {!isLoaded && <div className="absolute inset-0 animate-pulse bg-stone-300"></div>}
+            {isIntersecting && (
+                <img 
+                    src={src} 
+                    alt={alt} 
+                    onLoad={() => setIsLoaded(true)}
+                    className={`w-full h-full transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${imgClassName}`} 
+                />
+            )}
+        </div>
+    );
+};
+
+// Komponen Slider Gambar
 const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay, titleAlt="Paket Wisata Jogja" }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const validImages = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1542601906990-b4d3fb778b09'];
@@ -265,7 +297,12 @@ const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay, title
     return (
         <div className={`relative ${heightClass} w-full overflow-hidden group rounded-t-3xl`}>
             {validImages.map((img, idx) => (
-                <img key={idx} src={img} alt={`${titleAlt} - Foto ${idx + 1}`} className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
+                <LazyImage 
+                    key={idx} 
+                    src={img} 
+                    alt={`${titleAlt} - Foto ${idx + 1}`} 
+                    className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} 
+                />
             ))}
             <div className="absolute inset-0 bg-gradient-to-t from-stone-900/90 via-stone-900/20 to-transparent z-10"></div>
             
@@ -363,7 +400,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                         <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 opacity-90 hover:opacity-100 transition-all duration-500">
                             {kemitraan.slice(0, 4).map((mitra, idx) => (
                                 <div key={idx} className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-full border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
-                                    <img src={mitra.logo} alt={`Logo Mitra ${mitra.name} Desa Wisata Jogja`} className="w-8 h-8 rounded-full object-contain bg-white" />
+                                    <LazyImage src={mitra.logo} alt={`Logo Mitra ${mitra.name} Desa Wisata Jogja`} className="w-8 h-8 rounded-full bg-white flex-shrink-0" imgClassName="object-contain" />
                                     <span className="font-bold text-stone-700 text-sm">{mitra.name}</span>
                                 </div>
                             ))}
@@ -392,7 +429,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 <div key={index} className={`flex flex-col lg:flex-row gap-8 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
                                     <div className="w-full lg:w-1/2">
                                         <div className="relative rounded-3xl overflow-hidden shadow-lg group">
-                                            <img src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} alt={`Edukasi Wisata Jogja - ${data.title}`} className="w-full h-64 sm:h-[300px] md:h-[400px] object-cover object-center group-hover:scale-105 transition-transform duration-700" />
+                                            <LazyImage src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} alt={`Edukasi Wisata Jogja - ${data.title}`} className="w-full h-64 sm:h-[300px] md:h-[400px] group-hover:scale-105 transition-transform duration-700" />
                                         </div>
                                     </div>
                                     <div className="w-full lg:w-1/2 space-y-6">
@@ -504,7 +541,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 {olehOleh.map((oo, idx) => (
                                     <div key={oo.id || idx} className="bg-stone-800 border border-stone-700 rounded-2xl overflow-hidden flex flex-col hover:border-amber-500 transition-colors group">
                                         <div className="h-40 overflow-hidden relative">
-                                            <img src={oo.image} alt={oo.title} loading="lazy" className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
+                                            <LazyImage src={oo.image} alt={oo.title} className="w-full h-full group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
                                             {oo.paket_id && (
                                                 <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-bold text-sm border border-stone-700">{oo.paket_id}</div>
                                             )}
@@ -564,7 +601,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {galeri.map((src, idx) => (
                             <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-200 shadow-md">
-                                <img src={src} alt={`Dokumentasi Desa Wisata Jogja - ${idx+1}`} className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110" />
+                                <LazyImage src={src} alt={`Dokumentasi Desa Wisata Jogja - ${idx+1}`} className="w-full h-full group-hover:scale-110 transition-transform duration-500" />
                             </div>
                         ))}
                     </div>
@@ -603,7 +640,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 {filteredPartners.map((mitra, index) => (
                                     <div key={index} className="bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-sm hover:shadow-xl transition-all flex flex-col items-center text-center group">
                                         <div className="w-24 h-24 rounded-full overflow-hidden mb-5 border-4 border-stone-50 shadow-md group-hover:scale-105 transition-transform duration-300 bg-white">
-                                            <img src={mitra.logo || fallbackMitra[0].logo} alt={mitra.name} className="w-full h-full object-contain p-2" />
+                                            <LazyImage src={mitra.logo || fallbackMitra[0].logo} alt={mitra.name} className="w-full h-full" imgClassName="object-contain p-2" />
                                         </div>
                                         <h3 className="text-lg font-bold text-stone-800 mb-3 line-clamp-2">{mitra.name}</h3>
                                         <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${mitra.badge || 'bg-stone-100 text-stone-700'}`}>{mitra.type}</span>
@@ -688,18 +725,19 @@ function PublicWebsite({ data, setGlobalRoute }) {
 }
 
 // ==============================================
-// 6. KOMPONEN LOGIN ADMIN
+// 6. KOMPONEN LOGIN ADMIN (SUPABASE AUTH - JWT)
 // ==============================================
 function LoginAdmin({ setGlobalRoute }) {
-    const [user, setUser] = useState('');
+    const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [loading, setLoading] = useState(false);
 
+    // Cek sesi yang sah langsung dari server Supabase
     useEffect(() => {
-        if (localStorage.getItem('admin_logged_in') === 'true') {
-            setGlobalRoute('admin');
-        }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) setGlobalRoute('admin');
+        });
     }, [setGlobalRoute]);
 
     const handleLogin = async (e) => {
@@ -708,28 +746,24 @@ function LoginAdmin({ setGlobalRoute }) {
         setStatus({ type: '', msg: '' });
 
         try {
-            const { data, error } = await supabase.from('admin_users').select('*').eq('username', user).limit(1);
-            const adminData = data && data.length > 0 ? data[0] : null;
-            
-            if (adminData && adminData.password === pass) {
-                localStorage.setItem('admin_logged_in', 'true');
-                localStorage.setItem('admin_username', user);
-                setStatus({ type: 'success', msg: 'Login berhasil!' });
+            // Melakukan login menggunakan Supabase Authentication (Bukan tabel buatan manual)
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: pass,
+            });
+
+            if (error) throw error;
+
+            if (data.session) {
+                setStatus({ type: 'success', msg: 'Login berhasil! Memuat dashboard...' });
                 setTimeout(() => setGlobalRoute('admin'), 1000);
-            } 
-            else if (user === 'admin' && pass === 'admin123') {
-                localStorage.setItem('admin_logged_in', 'true');
-                localStorage.setItem('admin_username', user);
-                setStatus({ type: 'success', msg: 'Login berhasil (Akses Default)!' });
-                setTimeout(() => setGlobalRoute('admin'), 1000);
-            } else {
-                setStatus({ type: 'error', msg: 'Username / Password salah!' });
             }
         } catch (err) {
-            setStatus({ type: 'error', msg: 'Terjadi kesalahan sistem database.' });
+            setStatus({ type: 'error', msg: err.message || 'Login gagal. Periksa kembali email dan password Anda.' });
             console.error("Login Error:", err);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -751,12 +785,12 @@ function LoginAdmin({ setGlobalRoute }) {
                     )}
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-user text-emerald-600 mr-2"></i> Username</label>
-                            <input type="text" required value={user} onChange={(e)=>setUser(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin" />
+                            <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-envelope text-emerald-600 mr-2"></i> Email Admin</label>
+                            <input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin@kampungberseri.com" />
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-lock text-emerald-600 mr-2"></i> Password</label>
-                            <input type="password" required value={pass} onChange={(e)=>setPass(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin123" />
+                            <input type="password" required value={pass} onChange={(e)=>setPass(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Masukkan kata sandi..." />
                         </div>
                         <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex justify-center items-center gap-2 mt-6">
                             {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-sign-in-alt"></i> Masuk ke Dashboard</>}
@@ -783,7 +817,7 @@ function ManagePaket({ data, onSave, showToast }) {
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Paket Baru', price: 0, duration: '1 Hari', desc: '', activities: [], images: [], rawActivities: '' }]);
-    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus paket wisata ini?')) setItems(items.filter(i => i.id !== id)); };
+    const deleteItem = (id) => { if (window.confirm('Yakin ingin menghapus paket wisata ini?')) setItems(items.filter(i => i.id !== id)); };
     
     return (
         <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
@@ -824,7 +858,7 @@ function ManagePaket({ data, onSave, showToast }) {
                                     {(item.images || []).map((img, i) => (
                                         <div key={i} className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden border-2 border-stone-200 shadow-sm group">
                                             <img src={img} className="w-full h-full object-cover object-center" />
-                                            <button type="button" onClick={() => updateItem(item.id, 'images', item.images.filter((_, idx) => idx !== i))} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-sm md:text-lg"></i></button>
+                                            <button type="button" onClick={() => { if(window.confirm('Hapus foto ini?')) updateItem(item.id, 'images', item.images.filter((_, idx) => idx !== i)) }} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-sm md:text-lg"></i></button>
                                         </div>
                                     ))}
                                     <label className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-dashed border-emerald-300 bg-white text-emerald-600 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 hover:border-emerald-400 transition-all shadow-sm">
@@ -868,7 +902,7 @@ function ManageEdukasi({ data, onSave, showToast }) {
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Materi Baru', desc: '', image: '', details: [], rawDetails: '' }]);
-    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus materi edukasi ini?')) setItems(items.filter(i => i.id !== id)); };
+    const deleteItem = (id) => { if (window.confirm('Yakin ingin menghapus materi edukasi ini?')) setItems(items.filter(i => i.id !== id)); };
 
     return (
         <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
@@ -897,7 +931,7 @@ function ManageEdukasi({ data, onSave, showToast }) {
                                         {item.image ? (
                                             <>
                                                 <img src={item.image} className="w-full h-full object-cover object-center" />
-                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
+                                                <button type="button" onClick={() => { if(window.confirm('Hapus foto ini?')) updateItem(item.id, 'image', '') }} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
                                             </>
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-3xl sm:text-xl"></i></div>
@@ -941,7 +975,7 @@ function ManageKemitraan({ data, onSave, showToast }) {
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Mitra Baru', type: 'Instansi Pemerintah', logo: '', badge: 'bg-blue-50 text-blue-700' }]);
-    const deleteItem = (id) => { if (confirm('Hapus mitra ini?')) setItems(items.filter(i => i.id !== id)); };
+    const deleteItem = (id) => { if (window.confirm('Hapus mitra ini?')) setItems(items.filter(i => i.id !== id)); };
 
     return (
         <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
@@ -963,7 +997,7 @@ function ManageKemitraan({ data, onSave, showToast }) {
                             {item.logo ? (
                                 <>
                                     <img src={item.logo} className="w-full h-full object-contain p-1" />
-                                    <button type="button" onClick={() => updateItem(item.id, 'logo', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all rounded-full"><i className="fas fa-times"></i></button>
+                                    <button type="button" onClick={() => { if(window.confirm('Hapus logo ini?')) updateItem(item.id, 'logo', '') }} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all rounded-full"><i className="fas fa-times"></i></button>
                                 </>
                             ) : (
                                 <i className="fas fa-building text-3xl text-stone-300"></i>
@@ -1042,7 +1076,7 @@ function ManageGaleri({ data, onSave, showToast }) {
                 {items.map((url, idx) => (
                     <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-100 border-4 border-white shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-300">
                         <img src={url} className="w-full h-full object-cover object-center" />
-                        <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-900/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 md:gap-2 backdrop-blur-sm">
+                        <button type="button" onClick={() => { if(window.confirm('Yakin ingin menghapus foto ini dari galeri?')) setItems(items.filter((_, i) => i !== idx)) }} className="absolute inset-0 bg-red-900/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 md:gap-2 backdrop-blur-sm">
                             <i className="fas fa-trash text-2xl md:text-3xl"></i>
                             <span className="font-bold text-xs md:text-sm">Hapus Foto</span>
                         </button>
@@ -1065,7 +1099,7 @@ function ManageOlehOleh({ data, onSave, showToast }) {
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
     const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Oleh-Oleh Baru', paket_id: 'Umum', wa_number: '628...', description: '', image: '' }]);
-    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus produk suvenir ini?')) setItems(items.filter(i => i.id !== id)); };
+    const deleteItem = (id) => { if (window.confirm('Yakin ingin menghapus produk suvenir ini?')) setItems(items.filter(i => i.id !== id)); };
 
     return (
         <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
@@ -1100,7 +1134,7 @@ function ManageOlehOleh({ data, onSave, showToast }) {
                                         {item.image ? (
                                             <>
                                                 <img src={item.image} className="w-full h-full object-cover object-center" />
-                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
+                                                <button type="button" onClick={() => { if(window.confirm('Hapus foto ini?')) updateItem(item.id, 'image', '') }} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
                                             </>
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-3xl sm:text-2xl"></i></div>
@@ -1135,16 +1169,24 @@ function ManageOlehOleh({ data, onSave, showToast }) {
 // ==============================================
 // 8. KOMPONEN ADMIN DASHBOARD
 // ==============================================
-function AdminDashboard({ setGlobalRoute, data, refreshData }) {
+function AdminDashboard({ setGlobalRoute, data, refreshData, dbError }) {
     const [menu, setMenu] = useState('overview');
     const [toast, setToast] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    // Proteksi Route menggunakan sesi Supabase (Ditingkatkan: Pengecekan Interval 5 Menit)
     useEffect(() => {
-        if (localStorage.getItem('admin_logged_in') !== 'true') {
-            setGlobalRoute('login');
-        }
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                setGlobalRoute('login');
+            }
+        };
+        checkAuth();
+        
+        const interval = setInterval(checkAuth, 5 * 60 * 1000); // Cek sesi tiap 5 menit
+        return () => clearInterval(interval);
     }, [setGlobalRoute]);
     
     const hero = data?.hero || fallbackHero;
@@ -1164,9 +1206,8 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
         setTimeout(() => setToast(null), 4000);
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('admin_logged_in');
-        localStorage.removeItem('admin_username');
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         setGlobalRoute('public'); 
         setTimeout(() => window.location.reload(), 100);
     };
@@ -1185,42 +1226,80 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
         }
     };
 
+    // FUNGSI UNTUK MENYIMPAN ARRAY / LIST (Row-by-Row Update Aman)
     const handleSaveList = async (table, items) => {
         if(isSaving) return;
         setIsSaving(true);
         try {
-            await supabase.from(table).delete().neq('id', 0); 
-            
-            if (items.length > 0) {
-                let payload;
-                if (table === 'galeri') {
-                    payload = items.map(img => ({ image_url: img }));
-                } else {
-                    payload = items.map(item => {
-                        const { id, rawActivities, rawDetails, ...copy } = item;
-                        
-                        if (copy.desc !== undefined) {
-                            copy.description = copy.desc;
-                            delete copy.desc;
-                        }
+            if (table === 'galeri') {
+                // ROW-BY-ROW Galeri (Hindari delete massal)
+                const currentData = await supabase.from('galeri').select('id, image_url');
+                const currentItems = currentData.data || [];
+                const newUrls = items; // items di sini adalah array string (URL)
 
-                        if (table === 'paket') {
-                            copy.activities = (rawActivities || '').split('\n').map(s => s.trim()).filter(Boolean);
-                        }
-                        if (table === 'edukasi') {
-                            copy.details = (rawDetails || '').split('\n').filter(l => l.includes(':')).map(l => {
-                                const [label, ...rest] = l.split(':');
-                                return { label: label.trim(), value: rest.join(':').trim() };
-                            });
-                        }
-                        return copy;
-                    });
+                // Hapus yang tidak ada di list baru
+                for (const old of currentItems) {
+                    if (!newUrls.includes(old.image_url)) {
+                        await supabase.from('galeri').delete().eq('id', old.id);
+                    }
                 }
-                
-                const { error } = await supabase.from(table).insert(payload);
-                if (error) {
-                    if (error.code === '42501') throw new Error(`Akses Ditolak (RLS Aktif). Jalankan SQL ini di Supabase: ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY;`);
-                    throw error;
+
+                // Tambah yang belum ada
+                for (const url of newUrls) {
+                    const exists = currentItems.some(old => old.image_url === url);
+                    if (!exists) {
+                        const { error } = await supabase.from('galeri').insert({ image_url: url });
+                        if (error) {
+                            if (error.code === '42501') throw new Error(`Akses Ditolak (RLS Aktif). Jalankan SQL: ALTER TABLE galeri DISABLE ROW LEVEL SECURITY;`);
+                            throw error;
+                        }
+                    }
+                }
+            } else {
+                // ROW-BY-ROW Tabel Lain
+                const currentData = await supabase.from(table).select('id');
+                const currentIds = currentData.data ? currentData.data.map(d => d.id) : [];
+                const newIdsToKeep = [];
+
+                for (const item of items) {
+                    const { id, rawActivities, rawDetails, ...copy } = item;
+                    
+                    if (copy.desc !== undefined) {
+                        copy.description = copy.desc;
+                        delete copy.desc;
+                    }
+
+                    if (table === 'paket') {
+                        copy.activities = (rawActivities || '').split('\n').map(s => s.trim()).filter(Boolean);
+                    }
+                    if (table === 'edukasi') {
+                        copy.details = (rawDetails || '').split('\n').filter(l => l.includes(':')).map(l => {
+                            const [label, ...rest] = l.split(':');
+                            return { label: label.trim(), value: rest.join(':').trim() };
+                        });
+                    }
+
+                    if (id && id.toString().startsWith('new-')) {
+                        const { error } = await supabase.from(table).insert(copy);
+                        if (error) {
+                            if (error.code === '42501') throw new Error(`Akses Ditolak (RLS Aktif). Jalankan SQL: ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY;`);
+                            throw error;
+                        }
+                    } else if (id) {
+                        newIdsToKeep.push(id);
+                        const { error } = await supabase.from(table).update(copy).eq('id', id);
+                        if (error) {
+                            if (error.code === '42501') throw new Error(`Akses Ditolak (RLS Aktif). Jalankan SQL: ALTER TABLE ${table} DISABLE ROW LEVEL SECURITY;`);
+                            throw error;
+                        }
+                    }
+                }
+
+                // Hapus baris lama yang dihilangkan oleh Admin
+                const idsToDelete = currentIds.filter(dbId => !newIdsToKeep.includes(dbId));
+                for (const delId of idsToDelete) {
+                    const { error } = await supabase.from(table).delete().eq('id', delId);
+                    if (error) throw error;
                 }
             }
             
@@ -1287,7 +1366,16 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                 </div>
             </div>
             
-            <div className="flex-1 flex flex-col h-full overflow-hidden w-full">
+            <div className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
+                
+                {/* BANNER ERROR DATABASE */}
+                {dbError && (
+                    <div className="bg-red-600 text-white px-4 py-3 text-center text-sm md:text-base font-bold shadow-md z-40">
+                        <i className="fas fa-exclamation-triangle mr-2 animate-pulse"></i> 
+                        PERINGATAN: Gagal terhubung ke Database Supabase! Anda sedang melihat data cadangan (Palsu). Silakan cek koneksi atau buka gembok RLS Anda.
+                    </div>
+                )}
+
                 <div className="md:hidden bg-white shadow-sm px-4 py-3 flex justify-between items-center z-30">
                     <div className="font-bold text-stone-800 flex items-center gap-2"><i className="fas fa-leaf text-emerald-600"></i> Admin Panel</div>
                     <button onClick={() => setIsMobileMenuOpen(true)} className="text-stone-800 p-2"><i className="fas fa-bars text-xl"></i></button>
@@ -1353,7 +1441,7 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                                             {previewHeroImg ? (
                                                 <>
                                                     <img src={previewHeroImg} className="w-full h-full object-cover object-center" alt="Pratinjau Beranda" />
-                                                    <button type="button" onClick={() => setPreviewHeroImg('')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl"></i></button>
+                                                    <button type="button" onClick={() => { if(window.confirm('Hapus foto beranda?')) setPreviewHeroImg('') }} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl"></i></button>
                                                 </>
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center"><i className="fas fa-image text-stone-300 text-3xl sm:text-2xl"></i></div>
@@ -1416,23 +1504,42 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
 // 9. ROOT ROUTER (PENGENDALI UTAMA)
 // ==============================================
 function App() {
-    const [globalRoute, setGlobalRoute] = useState(() => {
-        const isLoggedIn = localStorage.getItem('admin_logged_in');
-        if (isLoggedIn === 'true') return 'admin';
-        return 'public';
-    });
+    const [globalRoute, setGlobalRoute] = useState('public');
     const [loading, setLoading] = useState(true);
+    const [dbError, setDbError] = useState(false); 
     const [data, setData] = useState({ hero: {}, paket: [], edukasi: [], kemitraan: [], galeri: [], olehOleh: [] });
 
     const loadAllData = async () => {
         setLoading(true);
+        setDbError(false);
         try {
-            const [hero, paket, edukasi, kemitraan, galeri, olehOleh] = await Promise.all([
-                fetchHero(), fetchPaket(), fetchEdukasi(), fetchKemitraan(), fetchGaleri(), fetchOlehOleh()
+            const [resHero, resPaket, resEdukasi, resMitra, resGaleri, resOlehOleh] = await Promise.all([
+                supabase.from('hero').select('*').eq('id', 1).maybeSingle(),
+                supabase.from('paket').select('*').order('id', { ascending: true }),
+                supabase.from('edukasi').select('*').order('id', { ascending: true }),
+                supabase.from('kemitraan').select('*').order('id', { ascending: true }),
+                supabase.from('galeri').select('*').order('id', { ascending: false }),
+                supabase.from('oleholeh').select('*').order('id', { ascending: true })
             ]);
-            setData({ hero, paket, edukasi, kemitraan, galeri, olehOleh });
+
+            if (resHero.error || resPaket.error || resEdukasi.error || resMitra.error || resGaleri.error || resOlehOleh.error) {
+                console.error("Kesalahan Database Ditemukan:", resHero.error || resPaket.error || resEdukasi.error);
+                setDbError(true);
+                setData({ hero: fallbackHero, paket: fallbackPaket, edukasi: fallbackEdukasi, kemitraan: fallbackMitra, galeri: fallbackGaleri, olehOleh: fallbackOlehOleh });
+            } else {
+                setData({
+                    hero: resHero.data || fallbackHero,
+                    paket: resPaket.data || [],
+                    edukasi: resEdukasi.data || [],
+                    kemitraan: resMitra.data || [],
+                    galeri: resGaleri.data ? resGaleri.data.map(i => i.image_url) : [],
+                    olehOleh: resOlehOleh.data || []
+                });
+            }
         } catch (error) {
-            console.error("Gagal memuat data dari Supabase:", error);
+            console.error("Gagal total memuat data Supabase:", error);
+            setDbError(true);
+            setData({ hero: fallbackHero, paket: fallbackPaket, edukasi: fallbackEdukasi, kemitraan: fallbackMitra, galeri: fallbackGaleri, olehOleh: fallbackOlehOleh });
         } finally {
             setLoading(false);
         }
@@ -1443,7 +1550,14 @@ function App() {
         if (route === 'public') window.scrollTo(0, 0);
     };
 
-    useEffect(() => { loadAllData(); }, []);
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) setGlobalRoute('admin'); 
+        };
+        checkSession();
+        loadAllData();
+    }, []);
 
     if (loading) return (
         <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
@@ -1456,7 +1570,7 @@ function App() {
         <React.Fragment>
             {globalRoute === 'public' && <PublicWebsite data={data} setGlobalRoute={handleRouteChange} />}
             {globalRoute === 'login'  && <LoginAdmin setGlobalRoute={handleRouteChange} />}
-            {globalRoute === 'admin'  && <AdminDashboard data={data} setGlobalRoute={handleRouteChange} refreshData={loadAllData} />}
+            {globalRoute === 'admin'  && <AdminDashboard data={data} setGlobalRoute={handleRouteChange} refreshData={loadAllData} dbError={dbError} />}
         </React.Fragment>
     );
 }
