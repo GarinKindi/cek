@@ -36,7 +36,7 @@
 
 <div id="root"></div>
 
-<script type="text/babel">
+<script>
 const { useState, useEffect, useRef } = React;
 
 // ==============================================
@@ -45,6 +45,124 @@ const { useState, useEffect, useRef } = React;
 const SUPABASE_URL = 'https://yiesgjzblaneltyuiazb.supabase.co';  
 const SUPABASE_ANON_KEY = 'sb_publishable_VV0HrXGLNlGa9GQGXSrWXA_X1qLdoUf';  
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ==============================================
+// FUNGSI UPLOAD GAMBAR KE SUPABASE STORAGE
+// ==============================================
+
+// Fungsi untuk upload gambar ke Supabase Storage
+async function uploadImageToStorage(file, folder = 'images') {
+    try {
+        console.log('📤 Mulai upload:', file.name);
+        
+        // Buat nama file unik (pakai tanggal + nomor acak)
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${folder}/${fileName}`;
+        
+        console.log('📁 Path file:', filePath);
+        
+        // Upload ke bucket yang sudah dibuat
+        const { data, error } = await supabase.storage
+            .from('website-images')  // NAMA BUCKET ANDA
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+        
+        if (error) {
+            console.error('❌ Error upload:', error);
+            throw error;
+        }
+        
+        console.log('✅ Upload berhasil ke Storage!');
+        
+        // Dapatkan URL publik gambar
+        const { data: { publicUrl } } = supabase.storage
+            .from('website-images')
+            .getPublicUrl(filePath);
+        
+        console.log('🔗 URL publik:', publicUrl);
+        
+        return publicUrl;
+        
+    } catch (error) {
+        console.error('❌ Upload gagal total:', error);
+        throw error;
+    }
+}
+
+// Fungsi baru untuk handle upload dengan validasi
+const handleImageUploadModern = async (event, callback, showToastFn) => {
+    const file = event.target.files[0];
+    
+    // Jika tidak ada file
+    if (!file) {
+        console.log('⚠️ Tidak ada file dipilih');
+        return;
+    }
+    
+    console.log('📎 File dipilih:', file.name, 'Ukuran:', (file.size / 1024).toFixed(2), 'KB');
+    
+    // Cek ukuran file (maksimal 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        const errorMsg = '❌ Ukuran gambar terlalu besar! Maksimal 2MB.';
+        console.error(errorMsg);
+        if (showToastFn) {
+            showToastFn(errorMsg, 'error');
+        } else {
+            alert(errorMsg);
+        }
+        event.target.value = '';
+        return;
+    }
+    
+    // Cek tipe file (hanya gambar)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        const errorMsg = '❌ Hanya file gambar (JPG, PNG, GIF, WEBP) yang diperbolehkan!';
+        console.error(errorMsg);
+        if (showToastFn) {
+            showToastFn(errorMsg, 'error');
+        } else {
+            alert(errorMsg);
+        }
+        event.target.value = '';
+        return;
+    }
+    
+    // Tampilkan pesan upload dimulai
+    if (showToastFn) {
+        showToastFn('📤 Mengupload gambar...', 'info');
+    }
+    
+    try {
+        // Upload ke Storage
+        const publicUrl = await uploadImageToStorage(file, 'images');
+        
+        // Panggil callback dengan URL hasil upload
+        callback(publicUrl);
+        
+        // Tampilkan pesan sukses
+        if (showToastFn) {
+            showToastFn('✅ Upload gambar berhasil!', 'success');
+        }
+        
+        console.log('🎉 Selesai! Gambar bisa diakses di:', publicUrl);
+        
+    } catch (error) {
+        console.error('❌ Upload error detail:', error);
+        const errorMsg = `❌ Upload gagal: ${error.message || 'Coba lagi nanti'}`;
+        if (showToastFn) {
+            showToastFn(errorMsg, 'error');
+        } else {
+            alert(errorMsg);
+        }
+    }
+    
+    // Reset input file
+    event.target.value = '';
+};
+    
 
 // ==============================================
 // FUNGSI GLOBAL UPLOAD GAMBAR DARI PERANGKAT
@@ -684,10 +802,11 @@ function ManagePaket({ data, onSave, showToast }) {
                                         <i className="fas fa-plus text-base md:text-lg mb-1"></i>
                                         <span className="text-[10px] font-bold">Upload</span>
                                         <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
-                                            handleImageUpload(e, (base64) => {
-                                                const newImages = [...(item.images || []), base64];
-                                                updateItem(item.id, 'images', newImages);
-                                            }, showToast);
+                                           onChange={(e) => {
+    handleImageUploadModern(e, (url) => {
+        setItems([url, ...items]);
+    }, showToast);
+}}
                                         }} />
                                     </label>
                                 </div>
@@ -759,7 +878,11 @@ function ManageEdukasi({ data, onSave, showToast }) {
                                     <label className="cursor-pointer bg-blue-50 text-blue-700 border border-blue-200 px-3 py-3 sm:py-2 rounded-lg font-bold text-xs hover:bg-blue-100 hover:border-blue-300 transition-all shadow-sm flex items-center justify-center gap-2 w-full text-center">
                                         <i className="fas fa-upload"></i> Upload Foto Baru
                                         <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
-                                            handleImageUpload(e, (base64) => updateItem(item.id, 'image', base64), showToast);
+                                            onChange={(e) => {
+    handleImageUploadModern(e, (url) => {
+        setItems([url, ...items]);
+    }, showToast);
+}}
                                         }} />
                                     </label>
                                 </div>
@@ -851,7 +974,11 @@ function ManageKemitraan({ data, onSave, showToast }) {
                                 <label className="cursor-pointer bg-amber-50 text-amber-700 border border-amber-200 px-3 py-2 rounded-lg font-bold text-xs hover:bg-amber-100 hover:border-amber-300 transition-all flex justify-center items-center gap-2 w-full text-center shadow-sm">
                                     <i className="fas fa-upload"></i> Pilih Gambar Logo
                                     <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
-                                        handleImageUpload(e, (base64) => updateItem(item.id, 'logo', base64), showToast);
+                                        onChange={(e) => {
+    handleImageUploadModern(e, (url) => {
+        setItems([url, ...items]);
+    }, showToast);
+}}
                                     }} />
                                 </label>
                             </div>
@@ -884,9 +1011,11 @@ function ManageGaleri({ data, onSave, showToast }) {
                     <span className="font-bold text-lg">Klik Disini Untuk Upload Foto Baru</span>
                     <span className="text-sm text-purple-500 mt-1">Format: JPG, JPEG, PNG. Maksimal ukuran 2MB per foto</span>
                     <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
-                        handleImageUpload(e, (base64) => {
-                            setItems([base64, ...items]); // Tambah ke posisi paling depan
-                        }, showToast);
+                        onChange={(e) => {
+    handleImageUploadModern(e, (url) => {
+        setItems([url, ...items]);
+    }, showToast);
+}}
                     }} />
                 </label>
             </div>
@@ -966,7 +1095,11 @@ function ManageOlehOleh({ data, onSave, showToast }) {
                                     <label className="cursor-pointer bg-green-50 text-green-700 border border-green-200 px-4 py-3 rounded-lg font-bold text-xs hover:bg-green-100 hover:border-green-300 transition-all shadow-sm flex items-center justify-center gap-2 w-full text-center">
                                         <i className="fas fa-upload"></i> Upload Foto Baru
                                         <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
-                                            handleImageUpload(e, (base64) => updateItem(item.id, 'image', base64), showToast);
+                                            onChange={(e) => {
+    handleImageUploadModern(e, (url) => {
+        setItems([url, ...items]);
+    }, showToast);
+}}
                                         }} />
                                     </label>
                                 </div>
