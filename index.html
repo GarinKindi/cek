@@ -77,8 +77,8 @@ const fallbackHero = {
 };
 
 const olehOlehDataStatic = [
-    { id: 'oo-1', paketId: 'Edukasi', waNumber: '6281111111111', title: 'Oleh-Oleh Edukasi', desc: 'Bawa pulang media tanam organik dan POC untuk dipraktikkan di rumah.', image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&q=80&w=600' },
-    { id: 'oo-2', paketId: 'Budaya', waNumber: '6282222222222', title: 'Oleh-Oleh Budaya', desc: 'Kerajinan tangan otentik, kain lurik, dan camilan tradisional.', image: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&q=80&w=600' }
+    { id: 'oo-1', paket_id: 'Edukasi', wa_number: '6281111111111', title: 'Oleh-Oleh Edukasi', description: 'Bawa pulang media tanam organik dan POC untuk dipraktikkan di rumah.', image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&q=80&w=600' },
+    { id: 'oo-2', paket_id: 'Budaya', wa_number: '6282222222222', title: 'Oleh-Oleh Budaya', description: 'Kerajinan tangan otentik, kain lurik, dan camilan tradisional.', image: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&q=80&w=600' }
 ];
 
 // ==============================================
@@ -93,6 +93,8 @@ async function fetchPaket() { const { data, error } = await supabase.from('paket
 async function fetchEdukasi() { const { data, error } = await supabase.from('edukasi').select('*').order('id', { ascending: true }); if (error) console.error("Error Edukasi:", error); return data || []; }
 async function fetchKemitraan() { const { data, error } = await supabase.from('kemitraan').select('*').order('id', { ascending: true }); if (error) console.error("Error Mitra:", error); return data || []; }
 async function fetchGaleri() { const { data, error } = await supabase.from('galeri').select('*').order('id', { ascending: false }); if (error) console.error("Error Galeri:", error); return data ? data.map(i => i.image_url) : []; }
+// FUNGSI BARU: Ambil Oleh-Oleh
+async function fetchOlehOleh() { const { data, error } = await supabase.from('oleholeh').select('*').order('id', { ascending: true }); if (error) console.error("Error Oleh-Oleh:", error); return data || []; }
 
 // ==============================================
 // 4. IKON & HELPER UNTUK UI KAYA FITUR
@@ -125,7 +127,7 @@ const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay }) => 
     return (
         <div className={`relative ${heightClass} w-full overflow-hidden group rounded-t-3xl`}>
             {validImages.map((img, idx) => (
-                <img key={idx} src={img} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
+                <img key={idx} src={img} className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
             ))}
             <div className="absolute inset-0 bg-gradient-to-t from-stone-900/90 via-stone-900/20 to-transparent z-10"></div>
             
@@ -157,11 +159,12 @@ function PublicWebsite({ data, setGlobalRoute }) {
     const [view, setView] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    const hero = data?.hero || fallbackHero;
+    const hero = Object.keys(data?.hero || {}).length > 0 ? data.hero : fallbackHero;
     const paket = data?.paket || [];
     const edukasi = data?.edukasi || [];
     const kemitraan = data?.kemitraan || [];
     const galeri = data?.galeri || [];
+    const olehOleh = data?.olehOleh?.length > 0 ? data.olehOleh : olehOlehDataStatic;
 
     const navLinks = [
         { id: 'home', label: 'Beranda' },
@@ -178,7 +181,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
         <div className="animate-in fade-in duration-500">
             <section className="relative bg-emerald-900 h-[600px] flex items-center">
                 <div className="absolute inset-0 z-0">
-                    <img src={hero.image} className="w-full h-full object-cover opacity-40 mix-blend-overlay" />
+                    <img src={hero.image} className="w-full h-full object-cover object-center opacity-40 mix-blend-overlay" />
                     <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 via-stone-900/20 to-transparent"></div>
                 </div>
                 <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left pt-20">
@@ -222,8 +225,8 @@ function PublicWebsite({ data, setGlobalRoute }) {
                         <p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-8">Telah Dipercaya & Dikunjungi Oleh</p>
                         <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 opacity-90 hover:opacity-100 transition-all duration-500">
                             {kemitraan.slice(0, 4).map((mitra, idx) => (
-                                <div key={idx} className="flex items-center gap-3 bg-stone-50 px-5 py-2.5 rounded-full border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
-                                    <img src={mitra.logo} alt={mitra.name} className="w-7 h-7 rounded-full object-cover shadow-sm" />
+                                <div key={idx} className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-full border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <img src={mitra.logo} alt={mitra.name} className="w-8 h-8 rounded-full object-contain bg-white" />
                                     <span className="font-bold text-stone-700 text-sm">{mitra.name}</span>
                                 </div>
                             ))}
@@ -248,12 +251,12 @@ function PublicWebsite({ data, setGlobalRoute }) {
                 ) : (
                     <div className="space-y-16">
                         {edukasi.map((data, index) => {
-                            const detailsList = Array.isArray(data.details) ? data.details : [{label: 'Keterangan', value: 'Lihat selengkapnya saat kunjungan.'}];
+                            const detailsList = Array.isArray(data.details) ? data.details : [];
                             return (
                                 <div key={index} className={`flex flex-col lg:flex-row gap-8 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
                                     <div className="w-full lg:w-1/2">
                                         <div className="relative rounded-3xl overflow-hidden shadow-lg group">
-                                            <img src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} className="w-full h-[300px] md:h-[400px] object-cover group-hover:scale-105 transition-transform duration-700" />
+                                            <img src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} className="w-full h-64 sm:h-[300px] md:h-[400px] object-cover object-center group-hover:scale-105 transition-transform duration-700" />
                                         </div>
                                     </div>
                                     <div className="w-full lg:w-1/2 space-y-6">
@@ -261,16 +264,18 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                             <h2 className="text-3xl font-bold text-emerald-800 mb-3">{data.title}</h2>
                                             <p className="text-stone-600 text-lg">{data.desc || data.description}</p>
                                         </div>
-                                        <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm">
-                                            <ul className="space-y-4">
-                                                {detailsList.map((detail, i) => (
-                                                    <li key={i} className="flex gap-4">
-                                                        <div className="w-1/3 font-semibold text-emerald-700 flex items-start gap-2"><CheckCircle2 className="text-amber-500 mt-1" />{detail.label}</div>
-                                                        <div className="w-2/3 text-stone-700">{detail.value}</div>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
+                                        {detailsList.length > 0 && (
+                                            <div className="bg-white rounded-2xl p-6 border border-emerald-100 shadow-sm">
+                                                <ul className="space-y-4">
+                                                    {detailsList.map((detail, i) => (
+                                                        <li key={i} className="flex gap-4">
+                                                            <div className="w-1/3 font-semibold text-emerald-700 flex items-start gap-2"><CheckCircle2 className="text-amber-500 mt-1" />{detail.label}</div>
+                                                            <div className="w-2/3 text-stone-700 break-words">{detail.value}</div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -328,8 +333,8 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                                 </div>
                                                 <ul className="space-y-2">
                                                     {activities.map((act, i) => (
-                                                        <li key={i} className="text-stone-600 text-sm flex items-start gap-2">
-                                                            <CheckCircle2 className="text-emerald-500 mt-1" />{act}
+                                                        <li key={i} className="text-stone-600 text-sm flex items-start gap-2 break-words">
+                                                            <CheckCircle2 className="text-emerald-500 mt-1 flex-shrink-0" /><span>{act}</span>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -347,7 +352,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                     )}
                 </div>
 
-                {/* Bagian Oleh-oleh */}
+                {/* Bagian Oleh-oleh / Suvenir */}
                 <div className="bg-stone-900 py-20 relative overflow-hidden">
                     <div className="absolute inset-0 opacity-5 pointer-events-none"><Leaf className="text-white text-[500px] transform -translate-x-1/4 -translate-y-1/4" /></div>
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -355,23 +360,29 @@ function PublicWebsite({ data, setGlobalRoute }) {
                             <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">Lengkapi Kunjungan dengan Oleh-Oleh</h2>
                             <p className="text-stone-400 max-w-2xl mx-auto text-lg">Dukung pemberdayaan warga lokal. Pilih suvenir khas Kampung Berseri.</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-center">
-                            {olehOlehDataStatic.map((oo) => (
-                                <div key={oo.id} className="bg-stone-800 border border-stone-700 rounded-2xl overflow-hidden flex flex-col hover:border-amber-500 transition-colors group">
-                                    <div className="h-40 overflow-hidden relative">
-                                        <img src={oo.image} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
-                                        <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-bold text-sm border border-stone-700">Paket {oo.paketId}</div>
+                        {olehOleh.length === 0 ? (
+                            <div className="text-center py-10 text-stone-500 border border-dashed border-stone-700 rounded-2xl">Belum ada daftar suvenir yang tersedia.</div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 justify-center">
+                                {olehOleh.map((oo, idx) => (
+                                    <div key={oo.id || idx} className="bg-stone-800 border border-stone-700 rounded-2xl overflow-hidden flex flex-col hover:border-amber-500 transition-colors group">
+                                        <div className="h-40 overflow-hidden relative">
+                                            <img src={oo.image} loading="lazy" className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
+                                            {oo.paket_id && (
+                                                <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-bold text-sm border border-stone-700">{oo.paket_id}</div>
+                                            )}
+                                        </div>
+                                        <div className="p-6 flex flex-col flex-grow">
+                                            <h4 className="font-bold text-white mb-2">{oo.title}</h4>
+                                            <p className="text-stone-400 text-sm mb-6 flex-grow">{oo.description || oo.desc}</p>
+                                            <button type="button" onClick={() => window.open(`https://wa.me/${oo.wa_number || oo.waNumber}?text=Halo saya tertarik dengan produk suvenir/oleh-oleh: ${oo.title}`, '_blank')} className="w-full bg-green-500 hover:bg-green-400 text-stone-950 font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm">
+                                                <MessageCircle /> Pesan via WA
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="p-6 flex flex-col flex-grow">
-                                        <h4 className="font-bold text-white mb-2">{oo.title}</h4>
-                                        <p className="text-stone-400 text-sm mb-6 flex-grow">{oo.desc}</p>
-                                        <button type="button" onClick={() => window.open(`https://wa.me/${oo.waNumber}?text=Halo saya ingin pesan oleh-oleh ${oo.title}`, '_blank')} className="w-full bg-green-500 hover:bg-green-400 text-stone-950 font-bold py-3 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 text-sm">
-                                            <MessageCircle /> Pesan via WA
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -388,11 +399,11 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 <Leaf className="absolute right-0 top-0 text-white text-7xl opacity-10 transform translate-x-4 -translate-y-4" />
                             </div>
                             <form onSubmit={handleBookingSubmit} className="p-6 space-y-4 bg-stone-50">
-                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Nama Pemesan</label><input type="text" required value={formData.nama} onChange={(e)=>setFormData({...formData, nama: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
-                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Asal/Instansi</label><input type="text" required value={formData.asal} onChange={(e)=>setFormData({...formData, asal: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Nama Pemesan</label><input type="text" required value={formData.nama} onChange={(e)=>setFormData({...formData, nama: e.target.value})} className="w-full border border-stone-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                                <div><label className="block text-sm font-bold text-stone-700 mb-1">Asal/Instansi</label><input type="text" required value={formData.asal} onChange={(e)=>setFormData({...formData, asal: e.target.value})} className="w-full border border-stone-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Jumlah</label><input type="number" required value={formData.jumlah} onChange={(e)=>setFormData({...formData, jumlah: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
-                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Tanggal</label><input type="date" required value={formData.tanggal} onChange={(e)=>setFormData({...formData, tanggal: e.target.value})} className="w-full border rounded-xl px-4 py-2" /></div>
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Jumlah</label><input type="number" required value={formData.jumlah} onChange={(e)=>setFormData({...formData, jumlah: e.target.value})} className="w-full border border-stone-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-1">Tanggal</label><input type="date" required value={formData.tanggal} onChange={(e)=>setFormData({...formData, tanggal: e.target.value})} className="w-full border border-stone-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
                                 </div>
                                 <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl mt-4 flex justify-center items-center gap-2 shadow-md"><MessageCircle /> Lanjut ke WhatsApp</button>
                             </form>
@@ -417,7 +428,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {galeri.map((src, idx) => (
                             <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-200">
-                                <img src={src} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                <img src={src} className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110" />
                             </div>
                         ))}
                     </div>
@@ -455,8 +466,8 @@ function PublicWebsite({ data, setGlobalRoute }) {
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8 mb-24">
                                 {filteredPartners.map((mitra, index) => (
                                     <div key={index} className="bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-sm hover:shadow-xl transition-all flex flex-col items-center text-center group">
-                                        <div className="w-24 h-24 rounded-full overflow-hidden mb-5 border-4 border-stone-50 shadow-md group-hover:scale-105 transition-transform duration-300">
-                                            <img src={mitra.logo || fallbackMitra[0].logo} alt={mitra.name} className="w-full h-full object-cover" />
+                                        <div className="w-24 h-24 rounded-full overflow-hidden mb-5 border-4 border-stone-50 shadow-md group-hover:scale-105 transition-transform duration-300 bg-white">
+                                            <img src={mitra.logo || fallbackMitra[0].logo} alt={mitra.name} className="w-full h-full object-contain p-2" />
                                         </div>
                                         <h3 className="text-lg font-bold text-stone-800 mb-3 line-clamp-2">{mitra.name}</h3>
                                         <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${mitra.badge || 'bg-stone-100 text-stone-700'}`}>{mitra.type}</span>
@@ -503,7 +514,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 </button>
                             ))}
                         </div>
-                        <button type="button" className="md:hidden text-stone-600 text-2xl" onClick={() => setIsMenuOpen(!isMenuOpen)}><i className={`fas fa-${isMenuOpen ? "times" : "bars"}`}></i></button>
+                        <button type="button" className="md:hidden text-stone-600 text-2xl p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}><i className={`fas fa-${isMenuOpen ? "times" : "bars"}`}></i></button>
                     </div>
                 </div>
                 {isMenuOpen && (
@@ -531,7 +542,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                     <p className="mb-6 max-w-md mx-auto">Wisata edukasi ramah lingkungan dan pelestarian budaya desa lokal.</p>
                     <div className="border-t border-stone-800 pt-8 flex flex-col md:flex-row justify-between items-center text-sm">
                         <p>&copy; {new Date().getFullYear()} Kampung Berseri. All rights reserved.</p>
-                        <button type="button" onClick={() => setGlobalRoute('login')} className="mt-4 md:mt-0 text-emerald-500 hover:text-emerald-400 transition flex items-center gap-2">
+                        <button type="button" onClick={() => setGlobalRoute('login')} className="mt-4 md:mt-0 text-emerald-500 hover:text-emerald-400 transition flex items-center justify-center gap-2 w-full md:w-auto">
                             <i className="fas fa-lock"></i> Admin Login
                         </button>
                     </div>
@@ -550,7 +561,6 @@ function LoginAdmin({ setGlobalRoute }) {
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [loading, setLoading] = useState(false);
 
-    // Cek status login HANYA saat komponen Login ini dibuka
     useEffect(() => {
         if (localStorage.getItem('admin_logged_in') === 'true') {
             setGlobalRoute('admin');
@@ -591,12 +601,12 @@ function LoginAdmin({ setGlobalRoute }) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-stone-900 flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-stone-900 flex flex-col items-center justify-center p-4 relative">
             <button type="button" onClick={() => setGlobalRoute('public')} className="absolute top-6 left-6 text-white hover:text-emerald-200 flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-md transition">
                 <i className="fas fa-arrow-left"></i> Kembali ke Web
             </button>
 
-            <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden fade-in">
+            <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden fade-in mt-16 md:mt-0">
                 <div className="bg-emerald-600 p-6 text-center">
                     <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3"><i className="fas fa-leaf text-white text-3xl"></i></div>
                     <h2 className="text-2xl font-bold text-white">Admin Dashboard</h2>
@@ -610,11 +620,11 @@ function LoginAdmin({ setGlobalRoute }) {
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div>
                             <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-user text-emerald-600 mr-2"></i> Username</label>
-                            <input type="text" required value={user} onChange={(e)=>setUser(e.target.value)} className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin" />
+                            <input type="text" required value={user} onChange={(e)=>setUser(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin" />
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-stone-700 mb-2"><i className="fas fa-lock text-emerald-600 mr-2"></i> Password</label>
-                            <input type="password" required value={pass} onChange={(e)=>setPass(e.target.value)} className="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin123" />
+                            <input type="password" required value={pass} onChange={(e)=>setPass(e.target.value)} className="w-full border border-stone-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="admin123" />
                         </div>
                         <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-md flex justify-center items-center gap-2 mt-6">
                             {loading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-sign-in-alt"></i> Masuk ke Dashboard</>}
@@ -630,61 +640,66 @@ function LoginAdmin({ setGlobalRoute }) {
 }
 
 // ==============================================
-// 7. KOMPONEN CRUD ADMIN
+// 7. KOMPONEN CRUD ADMIN (DENGAN EFEK SHADOW POP-UP)
 // ==============================================
 function ManagePaket({ data, onSave, showToast }) {
-    const [items, setItems] = useState(data || []);
+    const [items, setItems] = useState([]);
     
-    useEffect(() => { setItems(data || []); }, [data]);
+    useEffect(() => { 
+        setItems((data || []).map(item => ({
+            ...item,
+            rawActivities: Array.isArray(item.activities) ? item.activities.join('\n') : ''
+        }))); 
+    }, [data]);
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
-    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Paket Baru', price: 0, duration: '1 Hari', desc: '', activities: [], images: [] }]);
-    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus paket wisata ini? Data yang dihapus tidak bisa dikembalikan.')) setItems(items.filter(i => i.id !== id)); };
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), name: 'Paket Baru', price: 0, duration: '1 Hari', desc: '', activities: [], images: [], rawActivities: '' }]);
+    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus paket wisata ini?')) setItems(items.filter(i => i.id !== id)); };
     
     return (
-        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-stone-800">Kelola Paket Wisata</h2>
-                    <p className="text-stone-500 mt-1">Tambahkan, ubah, atau hapus pilihan paket wisata untuk pengunjung.</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800">Kelola Paket Wisata</h2>
+                    <p className="text-stone-500 mt-1 text-sm md:text-base">Tambahkan, ubah, atau hapus pilihan paket wisata untuk pengunjung.</p>
                 </div>
-                <button type="button" onClick={addNew} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Paket Baru</button>
+                <button type="button" onClick={addNew} className="w-full md:w-auto bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm flex items-center justify-center gap-2"><i className="fas fa-plus"></i> Tambah Paket Baru</button>
             </div>
             <div className="space-y-8">
                 {items.length === 0 && <div className="text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500 font-medium">Belum ada paket wisata. Klik tombol "Tambah Paket Baru" untuk memulai.</div>}
                 
                 {items.map((item, index) => (
-                    <div key={item.id} className="bg-stone-50/50 rounded-2xl p-6 border border-stone-200 relative shadow-sm hover:shadow-md transition duration-300">
-                        <div className="absolute top-0 left-0 bg-emerald-600 text-white px-4 py-1.5 rounded-br-2xl rounded-tl-2xl text-sm font-bold shadow-sm">Paket {index + 1}</div>
-                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2.5 rounded-xl transition" title="Hapus Paket"><i className="fas fa-trash"></i></button>
+                    <div key={item.id} className="bg-white rounded-2xl p-4 md:p-6 border border-stone-200 relative shadow-lg hover:shadow-xl hover:border-emerald-400 transition-all duration-300 mt-6">
+                        <div className="absolute -top-4 left-4 bg-emerald-600 text-white px-5 py-1.5 rounded-full text-xs md:text-sm font-bold shadow-md">Paket {index + 1}</div>
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 md:p-2.5 rounded-xl transition" title="Hapus Paket"><i className="fas fa-trash"></i></button>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 mt-6">
-                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Nama Paket</label><input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: Paket Edukasi" /></div>
-                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Harga (Isi dengan angka saja)</label><input type="number" value={item.price || 0} onChange={e => updateItem(item.id, 'price', parseInt(e.target.value) || 0)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: 75000" /></div>
-                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Durasi Wisata</label><input value={item.duration || ''} onChange={e => updateItem(item.id, 'duration', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: 4 Jam / 1 Hari" /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 mt-6 md:mt-4">
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Nama Paket</label><input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="Contoh: Paket Edukasi" /></div>
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Harga (Angka saja)</label><input type="number" value={item.price || 0} onChange={e => updateItem(item.id, 'price', parseInt(e.target.value) || 0)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="Contoh: 75000" /></div>
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Durasi Wisata</label><input value={item.duration || ''} onChange={e => updateItem(item.id, 'duration', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="Contoh: 4 Jam / 1 Hari" /></div>
                         </div>
                         <div className="mb-6">
                             <label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi Singkat</label>
-                            <textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" rows="2" placeholder="Ceritakan daya tarik dari paket ini..."></textarea>
+                            <textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" rows="2" placeholder="Ceritakan daya tarik dari paket ini..."></textarea>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                            <div className="bg-stone-50 p-4 md:p-5 rounded-2xl border border-stone-200">
                                 <label className="block text-sm font-bold text-stone-700 mb-1">Daftar Aktivitas</label>
-                                <p className="text-xs text-stone-500 mb-3"><i className="fas fa-keyboard text-emerald-500 mr-1"></i> Pisahkan setiap kegiatan dengan menekan tombol <strong>Enter</strong> (baris baru).</p>
-                                <textarea value={(item.activities || []).join('\n')} onChange={e => updateItem(item.id, 'activities', e.target.value.split('\n').map(s=>s.trim()).filter(Boolean))} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-stone-50" rows="4" placeholder="Keliling Desa Berseri&#10;Belajar Membuat Pupuk&#10;Makan Siang Bersama"></textarea>
+                                <p className="text-xs text-stone-500 mb-3"><i className="fas fa-keyboard text-emerald-500 mr-1"></i> Pisahkan kegiatan dengan <strong>Enter</strong>.</p>
+                                <textarea value={item.rawActivities ?? ''} onChange={e => updateItem(item.id, 'rawActivities', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-white transition-shadow" rows="4" placeholder="Keliling Desa Berseri&#10;Belajar Membuat Pupuk&#10;Makan Siang Bersama"></textarea>
                             </div>
-                            <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                            <div className="bg-stone-50 p-4 md:p-5 rounded-2xl border border-stone-200">
                                 <label className="block text-sm font-bold text-stone-700 mb-1">Foto Paket Wisata (Maks 2MB/foto)</label>
                                 <p className="text-xs text-stone-500 mb-3">Anda dapat mengunggah lebih dari 1 foto untuk paket wisata ini.</p>
                                 <div className="flex flex-wrap gap-3">
                                     {(item.images || []).map((img, i) => (
-                                        <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-stone-200 shadow-sm group">
-                                            <img src={img} className="w-full h-full object-cover" />
-                                            <button type="button" onClick={() => updateItem(item.id, 'images', item.images.filter((_, idx) => idx !== i))} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-lg"></i></button>
+                                        <div key={i} className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden border-2 border-stone-200 shadow-sm group">
+                                            <img src={img} className="w-full h-full object-cover object-center" />
+                                            <button type="button" onClick={() => updateItem(item.id, 'images', item.images.filter((_, idx) => idx !== i))} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-sm md:text-lg"></i></button>
                                         </div>
                                     ))}
-                                    <label className="w-20 h-20 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-100 transition shadow-sm">
-                                        <i className="fas fa-plus text-lg mb-1"></i>
+                                    <label className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-dashed border-emerald-300 bg-white text-emerald-600 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 hover:border-emerald-400 transition-all shadow-sm">
+                                        <i className="fas fa-plus text-base md:text-lg mb-1"></i>
                                         <span className="text-[10px] font-bold">Upload</span>
                                         <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
                                             handleImageUpload(e, (base64) => {
@@ -700,70 +715,66 @@ function ManagePaket({ data, onSave, showToast }) {
                 ))}
             </div>
             
-            <div className="mt-8 p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-4">
-                <div className="w-10 h-10 bg-amber-100 rounded-full flex justify-center items-center flex-shrink-0 text-amber-500 text-xl"><i className="fas fa-info-circle"></i></div>
+            <div className="mt-10 p-5 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-4 shadow-sm">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex justify-center items-center flex-shrink-0 text-amber-500 text-xl hidden sm:flex"><i className="fas fa-info-circle"></i></div>
                 <div>
-                    <h4 className="font-bold text-amber-800 text-lg">Penting!</h4>
-                    <p className="text-amber-700">Perubahan yang Anda lakukan belum tersimpan di website pengunjung. <strong>Pastikan Anda menekan tombol simpan hijau di bawah ini</strong> setelah selesai mengedit.</p>
+                    <h4 className="font-bold text-amber-800 text-base md:text-lg">Penting!</h4>
+                    <p className="text-amber-700 text-sm md:text-base">Perubahan yang Anda ketik di atas belum tersimpan ke Website. <strong>Pastikan menekan tombol simpan hijau di bawah ini</strong> setelah selesai.</p>
                 </div>
             </div>
-            <button type="button" onClick={(e) => { e.preventDefault(); onSave('paket', items); }} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA PERUBAHAN PAKET</button>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('paket', items); }} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-xl md:text-2xl"></i> SIMPAN SEMUA PERUBAHAN PAKET</button>
         </div>
     );
 }
 
 function ManageEdukasi({ data, onSave, showToast }) {
-    const [items, setItems] = useState(data || []);
+    const [items, setItems] = useState([]);
     
-    useEffect(() => { setItems(data || []); }, [data]);
+    useEffect(() => { 
+        setItems((data || []).map(item => ({
+            ...item,
+            rawDetails: Array.isArray(item.details) ? item.details.map(d => `${d.label}: ${d.value}`).join('\n') : ''
+        }))); 
+    }, [data]);
 
     const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
-    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Materi Baru', desc: '', image: '', details: [] }]);
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Materi Baru', desc: '', image: '', details: [], rawDetails: '' }]);
     const deleteItem = (id) => { if (confirm('Yakin ingin menghapus materi edukasi ini?')) setItems(items.filter(i => i.id !== id)); };
 
     return (
-        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-stone-800">Kelola Materi Edukasi</h2>
-                    <p className="text-stone-500 mt-1">Daftar pembelajaran yang bisa diikuti oleh wisatawan.</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800">Kelola Materi Edukasi</h2>
+                    <p className="text-stone-500 mt-1 text-sm md:text-base">Daftar pembelajaran yang bisa diikuti oleh wisatawan.</p>
                 </div>
-                <button type="button" onClick={addNew} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Materi Baru</button>
+                <button type="button" onClick={addNew} className="w-full md:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm flex items-center justify-center gap-2"><i className="fas fa-plus"></i> Tambah Materi Baru</button>
             </div>
             <div className="space-y-8">
                 {items.length === 0 && <div className="text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500 font-medium">Belum ada materi edukasi.</div>}
 
                 {items.map((item, index) => {
-                    const detailsStr = (item.details || []).map(d => `${d.label}: ${d.value}`).join('\n');
-                    const handleDetailsChange = (val) => {
-                        const newDetails = val.split('\n').filter(l => l.includes(':')).map(l => {
-                            const [label, ...rest] = l.split(':');
-                            return { label: label.trim(), value: rest.join(':').trim() };
-                        });
-                        updateItem(item.id, 'details', newDetails);
-                    };
-
                     return (
-                    <div key={item.id} className="bg-stone-50/50 rounded-2xl p-6 border border-stone-200 relative shadow-sm hover:shadow-md transition">
-                        <div className="absolute top-0 left-0 bg-blue-600 text-white px-4 py-1.5 rounded-br-2xl rounded-tl-2xl text-sm font-bold shadow-sm">Materi {index + 1}</div>
-                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2.5 rounded-xl transition" title="Hapus Materi"><i className="fas fa-trash"></i></button>
+                    <div key={item.id} className="bg-white rounded-2xl p-4 md:p-6 border border-stone-200 relative shadow-lg hover:shadow-xl hover:border-blue-400 transition-all duration-300 mt-6">
+                        <div className="absolute -top-4 left-4 bg-blue-600 text-white px-5 py-1.5 rounded-full text-xs md:text-sm font-bold shadow-md">Materi {index + 1}</div>
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 md:p-2.5 rounded-xl transition" title="Hapus Materi"><i className="fas fa-trash"></i></button>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 mt-6">
-                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Judul Materi Pembelajaran</label><input value={item.title || ''} onChange={e => updateItem(item.id, 'title', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: Pembuatan Pupuk Kompos" /></div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 mt-6 md:mt-4">
+                            <div><label className="block text-sm font-bold text-stone-700 mb-2">Judul Materi Pembelajaran</label><input value={item.title || ''} onChange={e => updateItem(item.id, 'title', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" placeholder="Contoh: Pembuatan Pupuk Kompos" /></div>
                             <div>
                                 <label className="block text-sm font-bold text-stone-700 mb-2">Foto Materi Utama</label>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-24 h-14 bg-stone-100 border border-stone-300 rounded-lg overflow-hidden shadow-sm relative group flex-shrink-0">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    <div className="w-full sm:w-24 h-32 sm:h-14 bg-stone-100 border border-stone-300 rounded-lg overflow-hidden shadow-sm relative group flex-shrink-0">
                                         {item.image ? (
                                             <>
-                                                <img src={item.image} className="w-full h-full object-cover" />
-                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash"></i></button>
+                                                <img src={item.image} className="w-full h-full object-cover object-center" />
+                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
                                             </>
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-xl"></i></div>
+                                            <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-3xl sm:text-xl"></i></div>
                                         )}
                                     </div>
-                                    <label className="cursor-pointer bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg font-bold text-xs hover:bg-blue-100 transition shadow-sm flex items-center justify-center gap-2 w-full text-center">
+                                    <label className="cursor-pointer bg-blue-50 text-blue-700 border border-blue-200 px-3 py-3 sm:py-2 rounded-lg font-bold text-xs hover:bg-blue-100 hover:border-blue-300 transition-all shadow-sm flex items-center justify-center gap-2 w-full text-center">
                                         <i className="fas fa-upload"></i> Upload Foto Baru
                                         <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
                                             handleImageUpload(e, (base64) => updateItem(item.id, 'image', base64), showToast);
@@ -772,23 +783,24 @@ function ManageEdukasi({ data, onSave, showToast }) {
                                 </div>
                             </div>
                         </div>
-                        <div className="mb-6"><label className="block text-sm font-bold text-stone-700 mb-2">Penjelasan Singkat</label><textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none" rows="2" placeholder="Gambarkan materi ini secara singkat..."></textarea></div>
-                        <div className="bg-white p-5 rounded-2xl border border-stone-200">
+                        <div className="mb-6"><label className="block text-sm font-bold text-stone-700 mb-2">Penjelasan Singkat</label><textarea value={item.desc || item.description || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" rows="2" placeholder="Gambarkan materi ini secara singkat..."></textarea></div>
+                        <div className="bg-stone-50 p-4 md:p-5 rounded-2xl border border-stone-200">
                             <label className="block text-sm font-bold text-stone-700 mb-1">Info Tambahan Terperinci</label>
                             <p className="text-xs text-stone-500 mb-3">Tuliskan nama info dan isinya dipisah tanda <strong>titik dua (:)</strong>. Gunakan <strong>Enter</strong> untuk membuat info baru.</p>
-                            <textarea value={detailsStr} onChange={e => handleDetailsChange(e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none bg-stone-50 leading-relaxed" rows="3" placeholder={"Contoh penulisan:\nBahan : Kotoran sapi dan dedaunan kering\nLama Proses : Sekitar 2 Minggu\nHasil : Pupuk organik siap pakai"}></textarea>
+                            <textarea value={item.rawDetails ?? ''} onChange={e => updateItem(item.id, 'rawDetails', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none bg-white leading-relaxed transition-shadow" rows="3" placeholder={"Contoh penulisan:\nBahan : Kotoran sapi dan dedaunan kering\nLama Proses : Sekitar 2 Minggu\nHasil : Pupuk organik siap pakai"}></textarea>
                         </div>
                     </div>
                 )})}
             </div>
             
-            <div className="mt-8 p-4 bg-blue-50 rounded-2xl border border-blue-200 flex items-start gap-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex justify-center items-center flex-shrink-0 text-blue-500 text-xl"><i className="fas fa-info-circle"></i></div>
+            <div className="mt-10 p-5 bg-blue-50 rounded-2xl border border-blue-200 flex items-start gap-4 shadow-sm">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex justify-center items-center flex-shrink-0 text-blue-500 text-xl hidden sm:flex"><i className="fas fa-info-circle"></i></div>
                 <div>
-                    <p className="text-blue-800 pt-2 font-medium">Pastikan menekan tombol simpan di bawah ini agar materi tampil di website.</p>
+                    <h4 className="font-bold text-blue-800 text-base md:text-lg">Pengingat</h4>
+                    <p className="text-blue-700 text-sm sm:text-base">Pastikan menekan tombol simpan biru di bawah ini agar materi tampil di website.</p>
                 </div>
             </div>
-            <button type="button" onClick={(e) => { e.preventDefault(); onSave('edukasi', items); }} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA MATERI EDUKASI</button>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('edukasi', items); }} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-xl md:text-2xl"></i> SIMPAN SEMUA MATERI EDUKASI</button>
         </div>
     );
 }
@@ -803,25 +815,26 @@ function ManageKemitraan({ data, onSave, showToast }) {
     const deleteItem = (id) => { if (confirm('Hapus mitra ini?')) setItems(items.filter(i => i.id !== id)); };
 
     return (
-        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
+        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-stone-800">Daftar Kunjungan & Mitra</h2>
-                    <p className="text-stone-500 mt-1">Siapa saja instansi yang pernah berkunjung atau bekerja sama.</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800">Daftar Kunjungan & Mitra</h2>
+                    <p className="text-stone-500 mt-1 text-sm md:text-base">Siapa saja instansi yang pernah berkunjung atau bekerja sama.</p>
                 </div>
-                <button type="button" onClick={addNew} className="bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-700 transition shadow-sm flex items-center gap-2"><i className="fas fa-plus"></i> Tambah Mitra Baru</button>
+                <button type="button" onClick={addNew} className="w-full md:w-auto bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-700 transition shadow-sm flex items-center justify-center gap-2"><i className="fas fa-plus"></i> Tambah Mitra Baru</button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 {items.length === 0 && <div className="col-span-full text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500">Belum ada data instansi mitra.</div>}
                 
                 {items.map(item => (
-                    <div key={item.id} className="bg-stone-50 rounded-2xl p-5 border border-stone-200 flex flex-col sm:flex-row gap-5 items-center relative hover:shadow-md transition">
-                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg" title="Hapus"><i className="fas fa-trash"></i></button>
+                    <div key={item.id} className="bg-white rounded-2xl p-4 md:p-5 border border-stone-200 flex flex-col sm:flex-row gap-4 sm:gap-5 items-center relative shadow-lg hover:shadow-xl hover:border-amber-400 transition-all duration-300">
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg transition-colors" title="Hapus"><i className="fas fa-trash"></i></button>
                         
-                        <div className="w-20 h-20 bg-white rounded-full border-4 border-white shadow-sm flex-shrink-0 overflow-hidden flex items-center justify-center bg-stone-100 relative group">
+                        {/* Logo Preview untuk Mitra - Menggunakan object-contain agar logo instansi utuh */}
+                        <div className="w-20 h-20 bg-stone-50 rounded-full border-4 border-stone-100 shadow-inner flex-shrink-0 overflow-hidden flex items-center justify-center relative group">
                             {item.logo ? (
                                 <>
-                                    <img src={item.logo} className="w-full h-full object-cover"/>
+                                    <img src={item.logo} className="w-full h-full object-contain p-1" />
                                     <button type="button" onClick={() => updateItem(item.id, 'logo', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all rounded-full"><i className="fas fa-times"></i></button>
                                 </>
                             ) : (
@@ -831,7 +844,7 @@ function ManageKemitraan({ data, onSave, showToast }) {
                         <div className="flex-1 w-full space-y-3">
                             <div>
                                 <label className="text-xs font-bold text-stone-500 uppercase">Nama Instansi</label>
-                                <input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-lg p-2 font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 outline-none" placeholder="Contoh: Universitas Merdeka" />
+                                <input value={item.name || ''} onChange={e => updateItem(item.id, 'name', e.target.value)} className="w-full border border-stone-300 rounded-lg p-2 font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 outline-none transition-shadow" placeholder="Contoh: Universitas Merdeka" />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-stone-500 uppercase">Kategori</label>
@@ -843,7 +856,7 @@ function ManageKemitraan({ data, onSave, showToast }) {
                                     if(type==='Sekolah') badge = 'bg-amber-50 text-amber-700';
                                     updateItem(item.id, 'type', type);
                                     updateItem(item.id, 'badge', badge);
-                                }} className="w-full border border-stone-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white cursor-pointer">
+                                }} className="w-full border border-stone-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-stone-50 cursor-pointer transition-shadow">
                                     <option>Instansi Pemerintah</option>
                                     <option>Universitas</option>
                                     <option>Sekolah</option>
@@ -853,8 +866,8 @@ function ManageKemitraan({ data, onSave, showToast }) {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-stone-500 uppercase mb-1 block">Upload Logo Instansi</label>
-                                <label className="cursor-pointer bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-100 transition flex justify-center items-center gap-2 w-full text-center">
-                                    <i className="fas fa-upload"></i> Pilih Gambar
+                                <label className="cursor-pointer bg-amber-50 text-amber-700 border border-amber-200 px-3 py-2 rounded-lg font-bold text-xs hover:bg-amber-100 hover:border-amber-300 transition-all flex justify-center items-center gap-2 w-full text-center shadow-sm">
+                                    <i className="fas fa-upload"></i> Pilih Gambar Logo
                                     <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
                                         handleImageUpload(e, (base64) => updateItem(item.id, 'logo', base64), showToast);
                                     }} />
@@ -865,10 +878,10 @@ function ManageKemitraan({ data, onSave, showToast }) {
                 ))}
             </div>
             
-            <div className="mt-8 p-4 bg-amber-50 rounded-2xl border border-amber-200">
-                 <p className="text-amber-800 text-center font-medium">Data baru disimpan setelah Anda menekan tombol di bawah.</p>
+            <div className="mt-10 p-5 bg-amber-50 rounded-2xl border border-amber-200 shadow-sm">
+                 <p className="text-amber-800 text-center font-medium text-sm md:text-base">Data baru disimpan setelah Anda menekan tombol di bawah.</p>
             </div>
-            <button type="button" onClick={(e) => { e.preventDefault(); onSave('kemitraan', items); }} className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN SEMUA MITRA</button>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('kemitraan', items); }} className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-xl md:text-2xl"></i> SIMPAN SEMUA MITRA</button>
         </div>
     );
 }
@@ -879,12 +892,12 @@ function ManageGaleri({ data, onSave, showToast }) {
     useEffect(() => { setItems(data || []); }, [data]);
     
     return (
-        <div className="bg-white p-8 rounded-3xl shadow-sm fade-in">
-            <h2 className="text-3xl font-extrabold text-stone-800 mb-2">Kelola Galeri Foto</h2>
-            <p className="text-stone-500 mb-8">Kumpulan foto momen seru yang tampil di halaman Galeri.</p>
+        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800 mb-2">Kelola Galeri Foto</h2>
+            <p className="text-stone-500 mb-8 text-sm md:text-base">Kumpulan foto momen seru yang tampil di halaman Galeri.</p>
             
-            <div className="mb-8">
-                <label className="cursor-pointer w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border-2 border-dashed border-purple-300 rounded-2xl py-12 flex flex-col items-center justify-center transition-all">
+            <div className="mb-10">
+                <label className="cursor-pointer w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border-2 border-dashed border-purple-300 rounded-2xl py-12 flex flex-col items-center justify-center transition-all px-4 text-center shadow-sm hover:shadow-md">
                     <div className="w-16 h-16 bg-purple-200 text-purple-600 rounded-full flex items-center justify-center text-3xl mb-3 shadow-sm"><i className="fas fa-cloud-upload-alt"></i></div>
                     <span className="font-bold text-lg">Klik Disini Untuk Upload Foto Baru</span>
                     <span className="text-sm text-purple-500 mt-1">Format: JPG, JPEG, PNG. Maksimal ukuran 2MB per foto</span>
@@ -896,23 +909,100 @@ function ManageGaleri({ data, onSave, showToast }) {
                 </label>
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
                 {items.length === 0 && <div className="col-span-full text-center py-10 text-stone-400">Belum ada foto.</div>}
                 {items.map((url, idx) => (
-                    <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-100 border-2 border-stone-200 hover:border-purple-400 transition-colors">
-                        <img src={url} className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-900/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-                            <i className="fas fa-trash text-3xl"></i>
-                            <span className="font-bold text-sm">Hapus Foto</span>
+                    <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-100 border-4 border-white shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-300">
+                        <img src={url} className="w-full h-full object-cover object-center" />
+                        <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute inset-0 bg-red-900/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 md:gap-2 backdrop-blur-sm">
+                            <i className="fas fa-trash text-2xl md:text-3xl"></i>
+                            <span className="font-bold text-xs md:text-sm">Hapus Foto</span>
                         </button>
                     </div>
                 ))}
             </div>
             
-            <div className="mt-10 p-4 bg-purple-50 rounded-2xl border border-purple-200">
-                 <p className="text-purple-800 text-center font-medium">Klik tombol simpan di bawah untuk memperbarui galeri di website pengunjung.</p>
+            <div className="mt-10 p-5 bg-purple-50 rounded-2xl border border-purple-200 shadow-sm">
+                 <p className="text-purple-800 text-center font-medium text-sm md:text-base">Klik tombol simpan di bawah untuk memperbarui galeri di website pengunjung.</p>
             </div>
-            <button type="button" onClick={(e) => { e.preventDefault(); onSave('galeri', items); }} className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-extrabold py-4 rounded-2xl transition shadow-xl text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-2xl"></i> SIMPAN PERUBAHAN GALERI</button>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('galeri', items); }} className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-extrabold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-xl md:text-2xl"></i> SIMPAN PERUBAHAN GALERI</button>
+        </div>
+    );
+}
+
+// ==============================================
+// KOMPONEN CRUD ADMIN BARU: OLEH-OLEH
+// ==============================================
+function ManageOlehOleh({ data, onSave, showToast }) {
+    const [items, setItems] = useState(data || []);
+    
+    useEffect(() => { setItems(data || []); }, [data]);
+
+    const updateItem = (id, field, value) => setItems(items.map(i => i.id === id ? {...i, [field]: value} : i));
+    const addNew = () => setItems([...items, { id: 'new-' + Date.now(), title: 'Oleh-Oleh Baru', paket_id: 'Umum', wa_number: '628...', description: '', image: '' }]);
+    const deleteItem = (id) => { if (confirm('Yakin ingin menghapus produk suvenir ini?')) setItems(items.filter(i => i.id !== id)); };
+
+    return (
+        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full overflow-x-hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800">Kelola Suvenir / Oleh-Oleh</h2>
+                    <p className="text-stone-500 mt-1 text-sm md:text-base">Daftar produk lokal yang bisa dipesan wisatawan sebagai oleh-oleh.</p>
+                </div>
+                <button type="button" onClick={addNew} className="w-full md:w-auto bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-green-700 transition shadow-sm flex items-center justify-center gap-2"><i className="fas fa-plus"></i> Tambah Oleh-Oleh</button>
+            </div>
+            <div className="space-y-8">
+                {items.length === 0 && <div className="text-center py-12 bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 text-stone-500 font-medium">Belum ada daftar suvenir/oleh-oleh.</div>}
+
+                {items.map((item, index) => {
+                    return (
+                    <div key={item.id} className="bg-white rounded-2xl p-4 md:p-6 border border-stone-200 relative shadow-lg hover:shadow-xl hover:border-green-400 transition-all duration-300 mt-6">
+                        <div className="absolute -top-4 left-4 bg-green-600 text-white px-5 py-1.5 rounded-full text-xs md:text-sm font-bold shadow-md">Produk {index + 1}</div>
+                        <button type="button" onClick={() => deleteItem(item.id)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 md:p-2.5 rounded-xl transition" title="Hapus"><i className="fas fa-trash"></i></button>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 mt-6 md:mt-4">
+                            <div className="space-y-4">
+                                <div><label className="block text-sm font-bold text-stone-700 mb-2">Nama Produk / Oleh-Oleh</label><input value={item.title || ''} onChange={e => updateItem(item.id, 'title', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-shadow" placeholder="Contoh: Kerajinan Bambu" /></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-2">Kategori (Cth: Budaya)</label><input value={item.paket_id || ''} onChange={e => updateItem(item.id, 'paket_id', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-shadow" placeholder="Budaya" /></div>
+                                    <div><label className="block text-sm font-bold text-stone-700 mb-2">Nomor WA Admin</label><input value={item.wa_number || ''} onChange={e => updateItem(item.id, 'wa_number', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-shadow" placeholder="628..." /></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-stone-700 mb-2">Foto Produk</label>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    <div className="w-full sm:w-32 h-32 sm:h-24 bg-stone-100 border border-stone-300 rounded-lg overflow-hidden shadow-sm relative group flex-shrink-0">
+                                        {item.image ? (
+                                            <>
+                                                <img src={item.image} className="w-full h-full object-cover object-center" />
+                                                <button type="button" onClick={() => updateItem(item.id, 'image', '')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl sm:text-base"></i></button>
+                                            </>
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-stone-300"><i className="fas fa-image text-3xl sm:text-2xl"></i></div>
+                                        )}
+                                    </div>
+                                    <label className="cursor-pointer bg-green-50 text-green-700 border border-green-200 px-4 py-3 rounded-lg font-bold text-xs hover:bg-green-100 hover:border-green-300 transition-all shadow-sm flex items-center justify-center gap-2 w-full text-center">
+                                        <i className="fas fa-upload"></i> Upload Foto Baru
+                                        <input type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => {
+                                            handleImageUpload(e, (base64) => updateItem(item.id, 'image', base64), showToast);
+                                        }} />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div><label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi Produk</label><textarea value={item.description || item.desc || ''} onChange={e => updateItem(item.id, 'description', e.target.value)} className="w-full border border-stone-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-shadow" rows="2" placeholder="Ceritakan tentang produk suvenir ini..."></textarea></div>
+                    </div>
+                )})}
+            </div>
+            
+            <div className="mt-10 p-5 bg-green-50 rounded-2xl border border-green-200 flex items-start gap-4 shadow-sm">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex justify-center items-center flex-shrink-0 text-green-500 text-xl hidden sm:flex"><i className="fas fa-info-circle"></i></div>
+                <div>
+                    <h4 className="font-bold text-green-800 text-base md:text-lg">Pengingat</h4>
+                    <p className="text-green-700 text-sm sm:text-base">Pastikan menekan tombol simpan hijau di bawah ini agar produk oleh-oleh tampil di website.</p>
+                </div>
+            </div>
+            <button type="button" onClick={(e) => { e.preventDefault(); onSave('oleholeh', items); }} className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-extrabold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3"><i className="fas fa-save text-xl md:text-2xl"></i> SIMPAN DAFTAR OLEH-OLEH</button>
         </div>
     );
 }
@@ -923,6 +1013,8 @@ function ManageGaleri({ data, onSave, showToast }) {
 function AdminDashboard({ setGlobalRoute, data, refreshData }) {
     const [menu, setMenu] = useState('overview');
     const [toast, setToast] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile sidebar control
 
     // Proteksi Route Admin agar tidak sembarangan diakses
     useEffect(() => {
@@ -936,6 +1028,7 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
     const edukasi = data?.edukasi || [];
     const kemitraan = data?.kemitraan || [];
     const galeri = data?.galeri || [];
+    const olehOleh = data?.olehOleh || [];
 
     // State Lokal Khusus Preview Gambar Hero
     const [previewHeroImg, setPreviewHeroImg] = useState('');
@@ -954,21 +1047,27 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
         setGlobalRoute('login');
     };
 
-    // Fungsi menyimpan Hero Tunggal
+    // FUNGSI UNTUK MENYIMPAN HERO
     const wrapSave = async (apiCall, section) => {
+        if(isSaving) return;
+        setIsSaving(true);
         try {
             await apiCall();
             showToast(`Data ${section} berhasil diperbarui!`);
-            await refreshData(); // Sinkronkan ulang datanya
+            await refreshData(); // Sinkronkan ulang datanya dari database
         } catch (err) {
             showToast(`Gagal: ${err.message}`, 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
 
     // FUNGSI UNTUK MENYIMPAN ARRAY / LIST (Wipe & Insert Aman)
     const handleSaveList = async (table, items) => {
+        if(isSaving) return;
+        setIsSaving(true);
         try {
-            // Hapus semua data yang ada (id mulai dari 1, jadi neq 0 artinya hapus semua)
+            // Hapus semua data lama agar disinkronkan total dengan list terbaru.
             await supabase.from(table).delete().neq('id', 0);
             
             if (items.length > 0) {
@@ -977,19 +1076,25 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                     payload = items.map(img => ({ image_url: img }));
                 } else {
                     payload = items.map(item => {
-                        // 1. Ekstrak id sepenuhnya agar Supabase menghasilkan id baru dengan aman
-                        const { id, ...copy } = item;
+                        // 1. Cabut id agar Supabase yang otomatis membuat ID barunya
+                        const { id, rawActivities, rawDetails, ...copy } = item;
                         
-                        // 2. Samakan format desc ke description 
+                        // 2. Samakan field nama
                         if (copy.desc !== undefined) {
                             copy.description = copy.desc;
                             delete copy.desc;
                         }
 
-                        // 3. Cegah error jika kolom belum ada di Supabase.
-                        if (table === 'edukasi') delete copy.details;
-                        if (table === 'paket') delete copy.activities;
-                        if (table === 'kemitraan') delete copy.badge;
+                        // 3. Olah kembali string mentah (raw text) menjadi Array / Json sesuai format Database Anda
+                        if (table === 'paket') {
+                            copy.activities = (rawActivities || '').split('\n').map(s => s.trim()).filter(Boolean);
+                        }
+                        if (table === 'edukasi') {
+                            copy.details = (rawDetails || '').split('\n').filter(l => l.includes(':')).map(l => {
+                                const [label, ...rest] = l.split(':');
+                                return { label: label.trim(), value: rest.join(':').trim() };
+                            });
+                        }
                         
                         return copy;
                     });
@@ -1003,27 +1108,43 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
             }
             
             showToast(`Data ${table} berhasil disimpan!`);
-            // MUAT ULANG DATA AGAR UI TIDAK MENGGUNAKAN FALLBACK TAPI DATA DATABASE ASLI
+            // Tarik ulang data ke web agar benar-benar sinkron
             await refreshData(); 
         } catch (err) {
             showToast(`Gagal menyimpan ${table}: ` + err.message, 'error');
             console.error(err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     return (
-        <div className="flex h-screen bg-stone-100 fade-in">
+        <div className="flex h-screen bg-stone-100 fade-in overflow-hidden relative">
             {toast && (
                 <div className={`fixed top-4 right-4 z-[9999] px-6 py-4 rounded-xl text-white font-bold shadow-2xl transition-all flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'}`}>
                     <i className={`fas ${toast.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} text-2xl`}></i>
                     {toast.msg}
                 </div>
             )}
+            {isSaving && (
+                <div className="fixed inset-0 z-[9998] bg-stone-900/50 backdrop-blur-sm flex flex-col items-center justify-center text-white font-bold">
+                    <i className="fas fa-spinner fa-spin text-5xl mb-4"></i> Menyimpan Perubahan...
+                </div>
+            )}
             
-            <div className="w-64 bg-stone-900 text-stone-300 flex flex-col">
-                <div className="p-6 border-b border-stone-800 flex items-center gap-3">
-                    <i className="fas fa-leaf text-emerald-500 text-2xl"></i>
-                    <div><h1 className="font-bold text-white">Admin CMS</h1><p className="text-xs text-emerald-500">Kampung Berseri</p></div>
+            {/* Sidebar Overlay for Mobile */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>
+            )}
+
+            {/* Sidebar */}
+            <div className={`w-64 bg-stone-900 text-stone-300 flex flex-col fixed md:static inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out`}>
+                <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <i className="fas fa-leaf text-emerald-500 text-2xl"></i>
+                        <div><h1 className="font-bold text-white">Admin CMS</h1><p className="text-xs text-emerald-500">Kampung Berseri</p></div>
+                    </div>
+                    <button className="md:hidden text-white" onClick={() => setIsMobileMenuOpen(false)}><i className="fas fa-times text-xl"></i></button>
                 </div>
                 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -1032,10 +1153,11 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                         { id: 'hero', icon: 'home', label: 'Tampilan Beranda' },
                         { id: 'paket', icon: 'box', label: 'Paket Wisata' },
                         { id: 'edukasi', icon: 'book-open', label: 'Edukasi' },
+                        { id: 'oleholeh', icon: 'gift', label: 'Oleh-Oleh' }, // Menu Baru Oleh-Oleh
                         { id: 'kemitraan', icon: 'building', label: 'Mitra' },
                         { id: 'galeri', icon: 'images', label: 'Galeri' }
                     ].map(btn => (
-                        <button type="button" key={btn.id} onClick={() => setMenu(btn.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${menu === btn.id ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-stone-800'}`}>
+                        <button type="button" key={btn.id} onClick={() => { setMenu(btn.id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${menu === btn.id ? 'bg-emerald-600 text-white shadow-md' : 'hover:bg-stone-800'}`}>
                             <div className="w-5 text-center"><i className={`fas fa-${btn.icon}`}></i></div> {btn.label}
                         </button>
                     ))}
@@ -1051,119 +1173,129 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
                 </div>
             </div>
             
-            <div className="flex-1 overflow-auto p-8">
-                {menu === 'overview' && (
-                    <div className="fade-in">
-                        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-2xl p-8 text-white mb-8 shadow-md">
-                            <h2 className="text-3xl font-bold mb-2">Selamat Datang, Admin!</h2>
-                            <p className="text-emerald-100">Kelola konten website Kampung Berseri. Perubahan akan langsung tersimpan.</p>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                            {[
-                                { title: 'Paket', count: paket.length, icon: 'box', color: 'emerald' },
-                                { title: 'Edukasi', count: edukasi.length, icon: 'book-open', color: 'blue' },
-                                { title: 'Mitra', count: kemitraan.length, icon: 'building', color: 'amber' },
-                                { title: 'Galeri', count: galeri.length, icon: 'images', color: 'purple' }
-                            ].map((stat, i) => (
-                                <div key={i} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 border-${stat.color}-500`}>
-                                    <i className={`fas fa-${stat.icon} text-${stat.color}-200 text-4xl mb-3`}></i>
-                                    <p className="text-3xl font-extrabold text-stone-800">{stat.count}</p>
-                                    <p className="text-sm font-medium text-stone-500 uppercase tracking-wide">{stat.title}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-full overflow-hidden w-full">
+                {/* Mobile Header */}
+                <div className="md:hidden bg-white shadow-sm px-4 py-3 flex justify-between items-center z-30">
+                    <div className="font-bold text-stone-800 flex items-center gap-2"><i className="fas fa-leaf text-emerald-600"></i> Admin Panel</div>
+                    <button onClick={() => setIsMobileMenuOpen(true)} className="text-stone-800 p-2"><i className="fas fa-bars text-xl"></i></button>
+                </div>
 
-                {menu === 'hero' && (
-                    <div className="bg-white p-8 rounded-3xl shadow-sm fade-in max-w-4xl">
-                        <div className="mb-8">
-                            <h2 className="text-3xl font-extrabold text-stone-800">Pengaturan Halaman Utama</h2>
-                            <p className="text-stone-500 mt-1">Ini adalah teks sambutan besar yang pertama kali dilihat pengunjung saat membuka website Anda.</p>
-                        </div>
-                        
-                        <div className="space-y-6 bg-stone-50 p-6 md:p-8 rounded-2xl border border-stone-200">
-                            <div>
-                                <label className="block text-sm font-bold text-stone-700 mb-2">Tagline (Teks kecil di atas judul)</label>
-                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-md font-medium" defaultValue={hero.tagline} placeholder="Contoh: Destinasi Wisata Ramah Lingkungan" id="h-tagline" />
+                <div className="flex-1 overflow-auto p-4 md:p-8 w-full">
+                    {menu === 'overview' && (
+                        <div className="fade-in">
+                            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-3xl p-6 md:p-10 text-white mb-8 shadow-xl border border-emerald-500/30">
+                                <h2 className="text-2xl md:text-3xl font-bold mb-2">Selamat Datang, Admin!</h2>
+                                <p className="text-emerald-100 text-sm md:text-base">Kelola konten website Kampung Berseri. Perubahan akan langsung tersimpan.</p>
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-stone-700 mb-2">Judul Utama Website (Teks Putih)</label>
-                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold" defaultValue={hero.title_main || hero.titleMain} placeholder="Contoh: Wisata Edukasi" id="h-title" />
-                                <p className="text-xs text-stone-500 mt-2">Ini akan muncul paling besar di bagian atas beranda.</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                {[
+                                    { title: 'Paket', count: paket.length, icon: 'box', color: 'emerald' },
+                                    { title: 'Edukasi', count: edukasi.length, icon: 'book-open', color: 'blue' },
+                                    { title: 'Mitra', count: kemitraan.length, icon: 'building', color: 'amber' },
+                                    { title: 'Galeri', count: galeri.length, icon: 'images', color: 'purple' }
+                                ].map((stat, i) => (
+                                    <div key={i} className={`bg-white p-4 md:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-stone-100 border-b-4 border-b-${stat.color}-500 flex flex-col items-center md:items-start text-center md:text-left`}>
+                                        <i className={`fas fa-${stat.icon} text-${stat.color}-200 text-3xl md:text-4xl mb-3`}></i>
+                                        <p className="text-2xl md:text-3xl font-extrabold text-stone-800">{stat.count}</p>
+                                        <p className="text-xs md:text-sm font-bold text-stone-500 uppercase tracking-wide">{stat.title}</p>
+                                    </div>
+                                ))}
                             </div>
+                        </div>
+                    )}
 
-                            <div>
-                                <label className="block text-sm font-bold text-stone-700 mb-2">Kata Kunci Judul (Teks Kuning/Highlight)</label>
-                                <input className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold text-amber-600" defaultValue={hero.title_highlight || hero.titleHighlight} placeholder="Contoh: Kampung Berseri" id="h-title-highlight" />
+                    {menu === 'hero' && (
+                        <div className="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-stone-100 fade-in w-full max-w-4xl mx-auto overflow-hidden">
+                            <div className="mb-6 md:mb-8">
+                                <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800">Pengaturan Halaman Utama</h2>
+                                <p className="text-stone-500 mt-1 text-sm md:text-base">Ini adalah teks sambutan besar yang pertama kali dilihat pengunjung saat membuka website Anda.</p>
                             </div>
                             
-                            <div>
-                                <label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi / Kalimat Sambutan</label>
-                                <textarea className="w-full border border-stone-300 p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-stone-700" rows="5" defaultValue={hero.description} placeholder="Ceritakan singkat tentang tempat wisata Anda..." id="h-desc" />
-                                <p className="text-xs text-stone-500 mt-2">Teks pendukung di bawah judul utama yang menjelaskan sekilas tentang desa Anda.</p>
-                            </div>
+                            <div className="space-y-6 bg-stone-50 p-4 md:p-8 rounded-2xl border border-stone-200 shadow-inner">
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-700 mb-2">Tagline (Teks kecil di atas judul)</label>
+                                    <input className="w-full border border-stone-300 p-3 md:p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm md:text-md font-medium transition-shadow" defaultValue={hero.tagline} placeholder="Contoh: Destinasi Wisata Ramah Lingkungan" id="h-tagline" />
+                                </div>
 
-                            {/* FITUR UNGGAH FOTO BERANDA LOKAL */}
-                            <div className="pt-4 border-t border-stone-200">
-                                <label className="block text-sm font-bold text-stone-700 mb-3">Ganti Foto Latar Belakang (Gambar Besar)</label>
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
-                                    <div className="w-32 h-20 rounded-lg overflow-hidden bg-stone-100 flex-shrink-0 border border-stone-200 shadow-inner relative group">
-                                        {previewHeroImg ? (
-                                            <>
-                                                <img src={previewHeroImg} className="w-full h-full object-cover" alt="Pratinjau Beranda" />
-                                                <button type="button" onClick={() => setPreviewHeroImg('')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash"></i></button>
-                                            </>
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center"><i className="fas fa-image text-stone-300 text-2xl"></i></div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 w-full">
-                                        <input type="file" id="hero-img-upload" accept="image/jpeg, image/png, image/jpg" onChange={(e) => handleImageUpload(e, setPreviewHeroImg, showToast)} className="hidden" />
-                                        <label htmlFor="hero-img-upload" className="inline-flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-2.5 px-5 rounded-xl cursor-pointer transition w-full sm:w-auto text-center border border-emerald-200 shadow-sm">
-                                            <i className="fas fa-upload mr-2"></i> Pilih Foto Baru dari Perangkat
-                                        </label>
-                                        <p className="text-xs text-stone-500 mt-2">Format: JPG, JPEG, PNG. Maksimal 2MB agar website tetap cepat.</p>
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-700 mb-2">Judul Utama Website (Teks Putih)</label>
+                                    <input className="w-full border border-stone-300 p-3 md:p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-base md:text-lg font-bold transition-shadow" defaultValue={hero.title_main || hero.titleMain} placeholder="Contoh: Wisata Edukasi" id="h-title" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-700 mb-2">Kata Kunci Judul (Teks Kuning/Highlight)</label>
+                                    <input className="w-full border border-stone-300 p-3 md:p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-base md:text-lg font-bold text-amber-600 transition-shadow" defaultValue={hero.title_highlight || hero.titleHighlight} placeholder="Contoh: Kampung Berseri" id="h-title-highlight" />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-700 mb-2">Deskripsi / Kalimat Sambutan</label>
+                                    <textarea className="w-full border border-stone-300 p-3 md:p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-stone-700 text-sm md:text-base transition-shadow" rows="4" defaultValue={hero.description} placeholder="Ceritakan singkat tentang tempat wisata Anda..." id="h-desc" />
+                                </div>
+
+                                {/* FITUR UNGGAH FOTO BERANDA LOKAL */}
+                                <div className="pt-6 border-t border-stone-200">
+                                    <label className="block text-sm font-bold text-stone-700 mb-3">Ganti Foto Latar Belakang (Gambar Besar)</label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-5 bg-white p-5 rounded-2xl border border-stone-200 shadow-md hover:shadow-lg transition-shadow duration-300">
+                                        <div className="w-full sm:w-32 h-32 sm:h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 border-2 border-stone-200 shadow-inner relative group">
+                                            {previewHeroImg ? (
+                                                <>
+                                                    {/* Menggunakan object-cover dan object-center untuk foto pemandangan agar selalu fit dan proporsional */}
+                                                    <img src={previewHeroImg} className="w-full h-full object-cover object-center" alt="Pratinjau Beranda" />
+                                                    <button type="button" onClick={() => setPreviewHeroImg('')} className="absolute inset-0 bg-red-600/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><i className="fas fa-trash text-xl"></i></button>
+                                                </>
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center"><i className="fas fa-image text-stone-300 text-3xl sm:text-2xl"></i></div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 w-full">
+                                            <input type="file" id="hero-img-upload" accept="image/jpeg, image/png, image/jpg" onChange={(e) => handleImageUpload(e, setPreviewHeroImg, showToast)} className="hidden" />
+                                            <label htmlFor="hero-img-upload" className="inline-flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-2.5 px-5 rounded-xl cursor-pointer transition w-full sm:w-auto text-center border border-emerald-200 shadow-sm text-sm md:text-base">
+                                                <i className="fas fa-upload mr-2"></i> Pilih Foto Baru dari Perangkat
+                                            </label>
+                                            <p className="text-xs text-stone-500 mt-2 font-medium">Format: JPG, JPEG, PNG. Maksimal 2MB agar website tetap cepat.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div className="mt-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-4">
-                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex justify-center items-center flex-shrink-0 text-emerald-600 text-xl"><i className="fas fa-check-circle"></i></div>
-                            <div>
-                                <p className="text-emerald-800 pt-2 font-medium">Perubahan akan langsung terlihat di website publik setelah disimpan.</p>
+                            
+                            <div className="mt-8 p-5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-4 shadow-sm">
+                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex justify-center items-center flex-shrink-0 text-emerald-600 text-xl hidden sm:flex"><i className="fas fa-check-circle"></i></div>
+                                <div>
+                                    <h4 className="font-bold text-emerald-800 text-base md:text-lg">Sudah Selesai?</h4>
+                                    <p className="text-emerald-700 pt-0 sm:pt-1 font-medium text-sm md:text-base">Perubahan akan langsung terlihat di website publik setelah disimpan.</p>
+                                </div>
                             </div>
+                            
+                            <button type="button" disabled={isSaving} onClick={(e) => {
+                                e.preventDefault();
+                                const newHero = {
+                                    id: 1, 
+                                    tagline: document.getElementById('h-tagline').value,
+                                    title_main: document.getElementById('h-title').value, 
+                                    title_highlight: document.getElementById('h-title-highlight').value,
+                                    description: document.getElementById('h-desc').value,
+                                    image: previewHeroImg // Simpan gambar hasil upload!
+                                };
+                                wrapSave(async () => { 
+                                    const { error } = await supabase.from('hero').upsert(newHero); 
+                                    if (error) {
+                                        if (error.code === '42501') throw new Error('Akses Ditolak (RLS Aktif). Jalankan SQL ini di Supabase: ALTER TABLE hero DISABLE ROW LEVEL SECURITY;');
+                                        throw error;
+                                    }
+                                }, 'Halaman Utama');
+                            }} className="w-full mt-6 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-extrabold hover:bg-emerald-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 text-base md:text-lg flex justify-center items-center gap-3">
+                                {isSaving ? <i className="fas fa-spinner fa-spin text-xl"></i> : <i className="fas fa-save text-xl md:text-2xl"></i>} SIMPAN TAMPILAN UTAMA
+                            </button>
                         </div>
-                        
-                        <button type="button" onClick={(e) => {
-                            e.preventDefault();
-                            const newHero = {
-                                id: 1, 
-                                tagline: document.getElementById('h-tagline').value,
-                                title_main: document.getElementById('h-title').value, 
-                                title_highlight: document.getElementById('h-title-highlight').value,
-                                description: document.getElementById('h-desc').value,
-                                image: previewHeroImg // Simpan gambar hasil upload!
-                            };
-                            wrapSave(async () => { 
-                                const { error } = await supabase.from('hero').upsert(newHero); 
-                                if (error) {
-                                    if (error.code === '42501') throw new Error('Akses Ditolak (RLS Aktif). Jalankan SQL ini di Supabase: ALTER TABLE hero DISABLE ROW LEVEL SECURITY;');
-                                    throw error;
-                                }
-                            }, 'Halaman Utama');
-                        }} className="w-full mt-6 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-extrabold hover:bg-emerald-700 transition shadow-xl text-lg flex justify-center items-center gap-3">
-                            <i className="fas fa-save text-xl"></i> SIMPAN TAMPILAN UTAMA
-                        </button>
-                    </div>
-                )}
+                    )}
 
-                {menu === 'paket' && <ManagePaket data={paket} onSave={handleSaveList} showToast={showToast} />}
-                {menu === 'edukasi' && <ManageEdukasi data={edukasi} onSave={handleSaveList} showToast={showToast} />}
-                {menu === 'kemitraan' && <ManageKemitraan data={kemitraan} onSave={handleSaveList} showToast={showToast} />}
-                {menu === 'galeri' && <ManageGaleri data={galeri} onSave={handleSaveList} showToast={showToast} />}
+                    {menu === 'paket' && <ManagePaket data={paket} onSave={handleSaveList} showToast={showToast} />}
+                    {menu === 'edukasi' && <ManageEdukasi data={edukasi} onSave={handleSaveList} showToast={showToast} />}
+                    {menu === 'oleholeh' && <ManageOlehOleh data={olehOleh} onSave={handleSaveList} showToast={showToast} />}
+                    {menu === 'kemitraan' && <ManageKemitraan data={kemitraan} onSave={handleSaveList} showToast={showToast} />}
+                    {menu === 'galeri' && <ManageGaleri data={galeri} onSave={handleSaveList} showToast={showToast} />}
+                </div>
             </div>
         </div>
     );
@@ -1175,15 +1307,15 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
 function App() {
     const [globalRoute, setGlobalRoute] = useState('public');
     const [loading, setLoading] = useState(true);
-    const [data, setData] = useState({ hero: {}, paket: [], edukasi: [], kemitraan: [], galeri: [] });
+    const [data, setData] = useState({ hero: {}, paket: [], edukasi: [], kemitraan: [], galeri: [], olehOleh: [] });
 
     const loadAllData = async () => {
         setLoading(true);
         try {
-            const [hero, paket, edukasi, kemitraan, galeri] = await Promise.all([
-                fetchHero(), fetchPaket(), fetchEdukasi(), fetchKemitraan(), fetchGaleri()
+            const [hero, paket, edukasi, kemitraan, galeri, olehOleh] = await Promise.all([
+                fetchHero(), fetchPaket(), fetchEdukasi(), fetchKemitraan(), fetchGaleri(), fetchOlehOleh()
             ]);
-            setData({ hero, paket, edukasi, kemitraan, galeri });
+            setData({ hero, paket, edukasi, kemitraan, galeri, olehOleh });
         } catch (error) {
             console.error("Gagal memuat data dari Supabase:", error);
         } finally {
@@ -1197,9 +1329,9 @@ function App() {
     }, []);
 
     if (loading) return (
-        <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-stone-600 font-medium">Memuat data wisata...</p>
+        <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
+            <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+            <p className="text-stone-600 font-bold text-center animate-pulse">Memuat data Kampung Berseri...</p>
         </div>
     );
 
