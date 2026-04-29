@@ -38,6 +38,63 @@
 
 <script>
 const { useState, useEffect, useRef } = React;
+    // 👇👇👇 TAMBAHKAN KODE ERROR HANDLER DI SINI 👇👇👇
+// ==============================================
+// GLOBAL ERROR HANDLER (Mencegah White Screen)
+// ==============================================
+
+// Tangkap semua error JavaScript
+window.addEventListener('error', function(event) {
+    console.error('Global error caught:', event.error);
+    
+    // Tampilkan pesan error di layar (biar tidak putih)
+    const errorDiv = document.createElement('div');
+    errorDiv.style.position = 'fixed';
+    errorDiv.style.bottom = '10px';
+    errorDiv.style.right = '10px';
+    errorDiv.style.backgroundColor = 'red';
+    errorDiv.style.color = 'white';
+    errorDiv.style.padding = '10px';
+    errorDiv.style.borderRadius = '5px';
+    errorDiv.style.zIndex = '99999';
+    errorDiv.style.fontSize = '12px';
+    errorDiv.style.maxWidth = '80%';
+    errorDiv.innerHTML = `⚠️ Error: ${event.error?.message || 'Unknown error'}<br>Lihat console (F12) untuk detail`;
+    document.body.appendChild(errorDiv);
+    
+    // Hilangkan setelah 5 detik
+    setTimeout(() => errorDiv.remove(), 5000);
+});
+
+// Tangkap Promise rejection
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled rejection:', event.reason);
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.style.position = 'fixed';
+    errorDiv.style.bottom = '10px';
+    errorDiv.style.right = '10px';
+    errorDiv.style.backgroundColor = 'orange';
+    errorDiv.style.color = 'white';
+    errorDiv.style.padding = '10px';
+    errorDiv.style.borderRadius = '5px';
+    errorDiv.style.zIndex = '99999';
+    errorDiv.style.fontSize = '12px';
+    errorDiv.innerHTML = `⚠️ Warning: ${event.reason?.message || 'Unknown error'}`;
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => errorDiv.remove(), 5000);
+});
+
+    
+// 👆👆👆 TAMBAHKAN SAMPAI SINI 👆👆👆
+
+// ==============================================
+// 1. KONFIGURASI SUPABASE
+// ==============================================
+const SUPABASE_URL = 'https://yiesgjzblaneltyuiazb.supabase.co';  
+const SUPABASE_ANON_KEY = 'sb_publishable_VV0HrXGLNlGa9GQGXSrWXA_X1qLdoUf';  
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==============================================
 // 1. KONFIGURASI SUPABASE
@@ -1433,7 +1490,14 @@ function AdminDashboard({ setGlobalRoute, data, refreshData }) {
 // 9. ROOT ROUTER (PENGENDALI UTAMA)
 // ==============================================
 function App() {
-    const [globalRoute, setGlobalRoute] = useState('public');
+    const [globalRoute, setGlobalRoute] = useState(() => {
+        // Cek apakah admin sudah login sebelumnya
+        const isLoggedIn = localStorage.getItem('admin_logged_in');
+        if (isLoggedIn === 'true') {
+            return 'admin';
+        }
+        return 'public';
+    });
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState({ hero: {}, paket: [], edukasi: [], kemitraan: [], galeri: [], olehOleh: [] });
 
@@ -1445,11 +1509,51 @@ function App() {
             ]);
             setData({ hero, paket, edukasi, kemitraan, galeri, olehOleh });
         } catch (error) {
-            console.error("Gagal memuat data dari Supabase:", error);
+            console.error("Gagal memuat data:", error);
         } finally {
             setLoading(false);
         }
     };
+
+    // Fungsi untuk berpindah halaman dengan reset state
+    const handleRouteChange = (route) => {
+        setGlobalRoute(route);
+        
+        // Jika pindah ke public, scroll ke atas
+        if (route === 'public') {
+            window.scrollTo(0, 0);
+        }
+        
+        // Jika pindah ke login, kosongkan form
+        if (route === 'login') {
+            // Form akan di-reset oleh komponen LoginAdmin
+        }
+    };
+
+    useEffect(() => {
+        loadAllData();
+    }, []);
+
+    // Effect untuk memantau perubahan route
+    useEffect(() => {
+        console.log('Route berubah ke:', globalRoute);
+    }, [globalRoute]);
+
+    if (loading) return (
+        <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4">
+            <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4 shadow-lg"></div>
+            <p className="text-stone-600 font-bold text-center animate-pulse">Memuat data Kampung Berseri...</p>
+        </div>
+    );
+
+    return (
+        <React.Fragment>
+            {globalRoute === 'public' && <PublicWebsite data={data} setGlobalRoute={handleRouteChange} />}
+            {globalRoute === 'login'  && <LoginAdmin setGlobalRoute={handleRouteChange} />}
+            {globalRoute === 'admin'  && <AdminDashboard data={data} setGlobalRoute={handleRouteChange} refreshData={loadAllData} />}
+        </React.Fragment>
+    );
+}
 
     // Muat data HANYA saat aplikasi pertama kali dijalankan
     useEffect(() => {
