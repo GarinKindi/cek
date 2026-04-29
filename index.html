@@ -247,41 +247,41 @@ const Compass = ({ className }) => <i className={`fas fa-compass ${className}`}>
 const X = ({ className }) => <i className={`fas fa-times ${className}`}></i>;
 
 // ==============================================
-// OPTIMASI PERFORMA: Komponen Lazy Image Cerdas
+// OPTIMASI PERFORMA: Lazy Loading Image Component
 // ==============================================
-const LazyImage = ({ src, alt, className = "", imgClassName = "object-cover object-center" }) => {
-    const [isIntersecting, setIsIntersecting] = useState(false);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const containerRef = useRef();
-
+function LazyImage({ src, alt, className = "", imgClassName = "object-cover object-center" }) {
+    const [loaded, setLoaded] = useState(false);
+    const imgRef = useRef();
+    
     useEffect(() => {
-        const observer = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting) {
-                setIsIntersecting(true);
-                observer.disconnect(); // Berhenti memantau setelah gambar masuk layar
-            }
-        }, { rootMargin: '150px' }); // Unduh gambar 150px sebelum masuk ke layar
-
-        if (containerRef.current) {
-            observer.observe(containerRef.current);
-        }
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = imgRef.current;
+                    if (img) {
+                        img.src = src;
+                        img.onload = () => setLoaded(true);
+                    }
+                    observer.disconnect();
+                }
+            });
+        }, { rootMargin: '100px' }); // Unduh gambar 100px sebelum masuk ke dalam layar
+        
+        if (imgRef.current) observer.observe(imgRef.current);
         return () => observer.disconnect();
-    }, []);
-
+    }, [src]);
+    
     return (
-        <div ref={containerRef} className={`relative overflow-hidden bg-stone-200 ${className}`}>
-            {!isLoaded && <div className="absolute inset-0 animate-pulse bg-stone-300"></div>}
-            {isIntersecting && (
-                <img 
-                    src={src} 
-                    alt={alt} 
-                    onLoad={() => setIsLoaded(true)}
-                    className={`w-full h-full transition-opacity duration-500 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${imgClassName}`} 
-                />
-            )}
+        <div className={`relative overflow-hidden bg-stone-100 ${className}`}>
+            {!loaded && <div className="absolute inset-0 animate-pulse w-full h-full bg-stone-200"></div>}
+            <img 
+                ref={imgRef} 
+                alt={alt} 
+                className={`${loaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500 w-full h-full ${imgClassName}`} 
+            />
         </div>
     );
-};
+}
 
 // Komponen Slider Gambar
 const ImageSlider = ({ images, heightClass = "h-64 md:h-72", priceOverlay, titleAlt="Paket Wisata Jogja" }) => {
@@ -400,7 +400,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                         <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 opacity-90 hover:opacity-100 transition-all duration-500">
                             {kemitraan.slice(0, 4).map((mitra, idx) => (
                                 <div key={idx} className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-full border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
-                                    <LazyImage src={mitra.logo} alt={`Logo Mitra ${mitra.name} Desa Wisata Jogja`} className="w-8 h-8 rounded-full bg-white flex-shrink-0" imgClassName="object-contain" />
+                                    <LazyImage src={mitra.logo} alt={`Logo Mitra ${mitra.name} Desa Wisata Jogja`} className="w-8 h-8 rounded-full flex-shrink-0" imgClassName="object-contain p-1" />
                                     <span className="font-bold text-stone-700 text-sm">{mitra.name}</span>
                                 </div>
                             ))}
@@ -429,7 +429,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 <div key={index} className={`flex flex-col lg:flex-row gap-8 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
                                     <div className="w-full lg:w-1/2">
                                         <div className="relative rounded-3xl overflow-hidden shadow-lg group">
-                                            <LazyImage src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} alt={`Edukasi Wisata Jogja - ${data.title}`} className="w-full h-64 sm:h-[300px] md:h-[400px] group-hover:scale-105 transition-transform duration-700" />
+                                            <LazyImage src={data.image || 'https://images.unsplash.com/photo-1628189872167-27b0eb38e3e4'} alt={`Edukasi Wisata Jogja - ${data.title}`} className="w-full h-64 sm:h-[300px] md:h-[400px]" imgClassName="object-cover object-center group-hover:scale-105 transition-transform duration-700" />
                                         </div>
                                     </div>
                                     <div className="w-full lg:w-1/2 space-y-6">
@@ -541,7 +541,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                                 {olehOleh.map((oo, idx) => (
                                     <div key={oo.id || idx} className="bg-stone-800 border border-stone-700 rounded-2xl overflow-hidden flex flex-col hover:border-amber-500 transition-colors group">
                                         <div className="h-40 overflow-hidden relative">
-                                            <LazyImage src={oo.image} alt={oo.title} className="w-full h-full group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
+                                            <LazyImage src={oo.image} alt={oo.title} className="w-full h-full" imgClassName="object-cover object-center group-hover:scale-110 transition-transform duration-500 opacity-80 group-hover:opacity-100" />
                                             {oo.paket_id && (
                                                 <div className="absolute bottom-2 left-2 bg-stone-900/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-bold text-sm border border-stone-700">{oo.paket_id}</div>
                                             )}
@@ -601,7 +601,7 @@ function PublicWebsite({ data, setGlobalRoute }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {galeri.map((src, idx) => (
                             <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden bg-stone-200 shadow-md">
-                                <LazyImage src={src} alt={`Dokumentasi Desa Wisata Jogja - ${idx+1}`} className="w-full h-full group-hover:scale-110 transition-transform duration-500" />
+                                <LazyImage src={src} alt={`Dokumentasi Desa Wisata Jogja - ${idx+1}`} className="w-full h-full" imgClassName="object-cover object-center transition-transform duration-500 group-hover:scale-110" />
                             </div>
                         ))}
                     </div>
